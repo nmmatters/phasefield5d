@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "phasefield5d"
+version = "0.1.0"
+description = "Multi-component Cahn-Hilliard phase-field simulation for Fe-Mn-Ni-Co-Cu HEA spinodal decomposition"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "numba>=0.57",
+    "pandas>=2.0",
+    "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+    "pytest-cov",
+]
+materials = [
+    "mendeleev>=0.14",
+]
+all = [
+    "mendeleev>=0.14",
+    "pytest>=7",
+    "pytest-cov",
+]
+
+[project.scripts]
+simulate-spinodal = "phasefield5d.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["phasefield5d*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
