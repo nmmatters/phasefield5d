@@ -166,7 +166,7 @@ def parse_args_to_config(argv: List[str] | None = None, ncomp: int = 4) -> Simul
         late_tail_frames=int(args.late_tail_frames),
         same_initial_configurations=bool(args.same_initial_configurations),
         load_path=str(args.load_path),
-        log_name=str(args.log_name),
+        log_name=args.log_name or "",
         threads=int(args.threads),
         fft_workers=int(args.fft_workers),
     )
