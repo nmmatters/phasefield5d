@@ -90,6 +90,7 @@ simulate-spinodal --temperature 873K --initial_composition 0.1,0.2,0.3,0.2 ...
 | Parameter | Default | Description |
 |---|---|---|
 | `--temperature` | `873K` | Temperature tag; must match filename in CALPHAD data directory |
+| `--data_path` | *(repo)/data/FeMnNiCoCu_fcc* | Path to CALPHAD data directory. Defaults to `data/FeMnNiCoCu_fcc` inside the repo root, resolved relative to the script — not CWD |
 | `--initial_composition` | `0.1,0.2,0.2,0.5` | Mole fractions of the N−1 independent components (Mn, Ni, Co, Cu); Fe = 1 − sum |
 | `--system_dim` | `1` | Simulation dimensionality: 1, 2, or 3 |
 | `--direction` | `1,0,0` | **1D**: propagation direction. **2D**: plane normal (the simulation plane is perpendicular to this vector). **3D**: ignored |

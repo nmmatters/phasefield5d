@@ -31,6 +31,7 @@ def add_bool_flag(parser, name: str, default: bool = False, help_on: str = "", h
 class SimulationConfig:
     # thermodynamics
     temperature: str
+    data_path: str
     resolution: float
     system_dim: int
     atomic_radius_tag: str
@@ -77,6 +78,9 @@ def build_parser(ncomp: int = 4) -> argparse.ArgumentParser:
 
     thermo = p.add_argument_group("thermodynamics")
     thermo.add_argument("--temperature", type=str, default="873K")
+    thermo.add_argument("--data_path", type=str, default="",
+                        help="Path to CALPHAD data directory. Defaults to "
+                             "<repo_root>/data/FeMnNiCoCu_fcc.")
     thermo.add_argument("--resolution", type=float, default=0.01)
     thermo.add_argument("--system_dim", type=int, choices=[1, 2, 3], default=1)
     thermo.add_argument("--atomic_radius_tag", type=str, default="senkov")
@@ -138,6 +142,7 @@ def parse_args_to_config(argv: List[str] | None = None, ncomp: int = 4) -> Simul
     args = build_parser(ncomp=ncomp).parse_args(argv)
     return SimulationConfig(
         temperature=str(args.temperature),
+        data_path=str(args.data_path),
         resolution=float(args.resolution),
         system_dim=int(args.system_dim),
         atomic_radius_tag=str(args.atomic_radius_tag),

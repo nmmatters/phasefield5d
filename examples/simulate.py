@@ -1,8 +1,13 @@
 """Main Cahn-Hilliard simulation script for Fe-Mn-Ni-Co-Cu."""
 import os
 import shutil
+from pathlib import Path
 import numpy as np
 import time as runtime
+
+# Default CALPHAD data directory: <repo_root>/data/FeMnNiCoCu_fcc
+# Resolved relative to this script file so it works regardless of CWD.
+_DEFAULT_DATA_PATH = str(Path(__file__).parent.parent / "data" / "FeMnNiCoCu_fcc")
 
 from numba import set_num_threads, get_num_threads
 
@@ -63,7 +68,8 @@ def main():
     # -----------------------------------------------------------------------
     # CALPHAD data (built once; reused for kinetics and the main loop)
     # -----------------------------------------------------------------------
-    calphad_dataframe = load_calphad_dataframe(cfg.temperature)
+    data_path = cfg.data_path if cfg.data_path else _DEFAULT_DATA_PATH
+    calphad_dataframe = load_calphad_dataframe(cfg.temperature, path=data_path)
     _, data_grid = build_4d_grid(calphad_dataframe, cfg.resolution)
     tree, calphad_values = build_calphad_kdtree(calphad_dataframe)
 

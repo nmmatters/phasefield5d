@@ -48,6 +48,9 @@ fluctuation               = 1e-5
 threads                   = 4    # Numba parallel threads (optimal ~16 for 3D)
 fft_workers               = -1   # scipy.fft threads for elastic kernel; -1 = all cores
 
+# Data
+data_path                 = ""   # leave empty to use <repo_root>/data/FeMnNiCoCu_fcc
+
 # Modifier
 load_path                 = ""
 same_initial_configurations = False
@@ -78,6 +81,7 @@ def _build_cmd(temperature, init_comp, kappa_value, kappa_i,
     cmd += [
         str(TARGET_SCRIPT),
         "--temperature",               temperature,
+        "--data_path",                 str(data_path),
         "--resolution",                str(resolution),
         "--system_dim",                str(system_dim),
         "--atomic_radius_tag",         atomic_radius_tag,
