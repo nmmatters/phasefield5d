@@ -78,6 +78,32 @@ python run/launch.py
 ```
 Each combination is launched as a separate subprocess with stdout/stderr captured to a timestamped log file under `logs/`.
 
+### Background run with nohup (Linux/HPC)
+
+Use `-u` for unbuffered output so progress lines appear in the log in real time:
+
+```bash
+mkdir -p logs
+nohup python -u examples/simulate.py \
+    --temperature 873k \
+    --initial_composition 0.1,0.2,0.2,0.3 \
+    --kappa_value 5e-16 \
+    --system_dim 1 \
+    --direction 1,0,0 \
+    --mw 20 \
+    --ppw 8 \
+    --total_timesteps 500001 \
+    --threads 4 \
+    > logs/quickstart.log 2>&1 &
+
+echo "PID: $!"
+```
+
+Monitor progress:
+```bash
+tail -f logs/quickstart.log
+```
+
 ### Console script (after `pip install`)
 ```bash
 simulate-spinodal --temperature 873K --initial_composition 0.1,0.2,0.3,0.2 ...
