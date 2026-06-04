@@ -209,6 +209,7 @@ def main():
     composition_change_max = 0.0
     print("Initializing simulation...")
     start_time = runtime.perf_counter()
+    _last_pct = -1
 
     for timestep in range(cfg.total_timesteps):
         if out_of_bounds(current_composition):
@@ -266,6 +267,15 @@ def main():
             composition_change_lower_limit=cfg.lower_limit,
             composition_change_upper_limit=cfg.upper_limit,
         )
+
+        # Progress report every 1 %
+        pct = timestep * 100 // cfg.total_timesteps
+        if pct != _last_pct:
+            elapsed = runtime.perf_counter() - start_time
+            print(f"  {pct:3d}%  step {timestep:>10d}  t={time:.3e} s  "
+                  f"dt={time_increment:.2e} s  max_dX={composition_change_max:.2e}  "
+                  f"[{elapsed:.0f}s elapsed]", flush=True)
+            _last_pct = pct
 
         # Update composition
         time                += time_increment

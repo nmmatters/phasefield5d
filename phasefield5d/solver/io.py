@@ -18,7 +18,7 @@ from phasefield5d.utils.matrix import transform_to_full_element_vector_array
 
 def get_model_tag(atomic_radius_tag, include_cubic_anisotropy, direction, system_dim):
     if include_cubic_anisotropy:
-        model = "elastic_cubic_khachaturyan"
+        model = "elastic_cubic"
         if system_dim == 1:
             s = "".join(map(str, direction))
             model += f"_direction{s}"
