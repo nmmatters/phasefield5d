@@ -2,6 +2,7 @@
 import os
 import json
 import datetime
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -10,6 +11,10 @@ from matplotlib.ticker import FormatStrFormatter
 from phasefield5d.utils.figures import build_xy_axes
 from phasefield5d.utils.labels import get_composition_label
 from phasefield5d.utils.matrix import transform_to_full_element_vector_array
+
+# Repo root: phasefield5d/solver/io.py → up three levels
+_REPO_ROOT = Path(__file__).parent.parent.parent
+_RESULTS_ROOT = _REPO_ROOT / "results"
 
 
 # ---------------------------------------------------------------------------
@@ -111,9 +116,9 @@ def should_save(
 def _create_subdir(initial_composition, temperature, system_dim=1):
     subdir = get_composition_label(initial_composition, unicode=False,
                                    elements=["Fe", "Mn", "Ni", "Co", "Cu"])
-    dir_path = f"../results/cahn_hilliard_dynamics/{subdir}_at_{temperature}_{system_dim}dim"
-    os.makedirs(dir_path, exist_ok=True)
-    return dir_path
+    dir_path = _RESULTS_ROOT / "cahn_hilliard_dynamics" / f"{subdir}_at_{temperature}_{system_dim}dim"
+    dir_path.mkdir(parents=True, exist_ok=True)
+    return str(dir_path)
 
 
 def _create_run_directory(cfg, number_of_cells, cell_size, time_increment):
