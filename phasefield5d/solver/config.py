@@ -39,8 +39,8 @@ class SimulationConfig:
     initial_composition: np.ndarray
     fluctuation: float
     # system size
-    multiple_wavelength: int
-    points_per_wavelength: int
+    mw: int
+    ppw: int
     # energy gradient
     kappa_value: float
     kappa_i: np.ndarray
@@ -92,8 +92,8 @@ def build_parser(ncomp: int = 4) -> argparse.ArgumentParser:
     comp.add_argument("--fluctuation", type=float, default=1e-3)
 
     sysg = p.add_argument_group("system size")
-    sysg.add_argument("--multiple_wavelength", type=int, default=100)
-    sysg.add_argument("--points_per_wavelength", type=int, default=16)
+    sysg.add_argument("--mw", type=int, default=100)
+    sysg.add_argument("--ppw", type=int, default=16)
 
     kappa = p.add_argument_group("energy gradient")
     kappa.add_argument("--kappa_value", type=float, default=5e-16)
@@ -148,8 +148,8 @@ def parse_args_to_config(argv: List[str] | None = None, ncomp: int = 4) -> Simul
         atomic_radius_tag=str(args.atomic_radius_tag),
         initial_composition=np.asarray(args.initial_composition, dtype=float),
         fluctuation=float(args.fluctuation),
-        multiple_wavelength=int(args.multiple_wavelength),
-        points_per_wavelength=int(args.points_per_wavelength),
+        mw=int(args.mw),
+        ppw=int(args.ppw),
         kappa_value=float(args.kappa_value),
         kappa_i=np.asarray(args.kappa_i, dtype=float),
         include_cubic_anisotropy=bool(args.include_cubic_anisotropy),

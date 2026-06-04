@@ -42,8 +42,8 @@ late_tail_frames          = 1
 resolution                = 0.01
 system_dim                = 1
 atomic_radius_tag         = "senkov"
-multiple_wavelength       = 100
-points_per_wavelength     = 16
+mw                        = 100
+ppw                       = 16
 fluctuation               = 1e-5
 threads                   = 4    # Numba parallel threads (optimal ~16 for 3D)
 fft_workers               = -1   # scipy.fft threads for elastic kernel; -1 = all cores
@@ -87,8 +87,8 @@ def _build_cmd(temperature, init_comp, kappa_value, kappa_i,
         "--atomic_radius_tag",         atomic_radius_tag,
         "--initial_composition",       _as_str(init_comp),
         "--fluctuation",               str(fluctuation),
-        "--multiple_wavelength",       str(multiple_wavelength),
-        "--points_per_wavelength",     str(points_per_wavelength),
+        "--mw",                        str(mw),
+        "--ppw",                       str(ppw),
         "--kappa_value",               str(kappa_value),
         "--kappa_i",                   _as_str(kappa_i),
         "--include_cubic_anisotropy"   if include_cubic else "--no_include_cubic_anisotropy",

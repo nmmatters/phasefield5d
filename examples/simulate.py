@@ -119,8 +119,8 @@ def main():
 
     wavelength_max, cell_size, system_length, number_of_cells = get_system_dimensions(
         wavenumber_max,
-        ppw=cfg.points_per_wavelength,
-        mw=cfg.multiple_wavelength,
+        ppw=cfg.ppw,
+        mw=cfg.mw,
         dim=cfg.system_dim,
     )
 
