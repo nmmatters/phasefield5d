@@ -17,14 +17,14 @@ def _load_calphad_file(T, path, required_columns):
     return df[required_columns]
 
 
-def load_elemental_gibbs_free_energy(T, path="../data/thermocalc_raw/FeMnNiCoCu_fcc"):
+def load_elemental_gibbs_free_energy(T, path="../data/FeMnNiCoCu_fcc"):
     df = pd.read_csv(f"{path}/tchea4_elemental_gibbs_free_energy.csv", index_col=0)
     Gi = df[str(T)].to_numpy()
     print("FeMnNiCoCu elemental Gibbs free energy [kJ/mol]:", Gi)
     return Gi
 
 
-def load_calphad_dataframe(T, path="../data/thermocalc_raw/FeMnNiCoCu_fcc"):
+def load_calphad_dataframe(T, path="../data/FeMnNiCoCu_fcc"):
     """Load full CALPHAD table (compositions + chemical potentials + mobilities).
 
     Columns in returned DataFrame:
@@ -49,7 +49,7 @@ def load_calphad_dataframe(T, path="../data/thermocalc_raw/FeMnNiCoCu_fcc"):
     return df
 
 
-def load_composition_space(T="873k", path="../data/thermocalc_raw/FeMnNiCoCu_fcc"):
+def load_composition_space(T="873k", path="../data/FeMnNiCoCu_fcc"):
     cols = ["x(Mn)", "x(Ni)", "x(Co)", "x(Cu)"]
     df = _load_calphad_file(T, path, cols).copy()
     df.rename(columns={"x(Mn)": "X_Mn", "x(Ni)": "X_Ni",
@@ -59,7 +59,7 @@ def load_composition_space(T="873k", path="../data/thermocalc_raw/FeMnNiCoCu_fcc
     return out
 
 
-def load_gibbs_enthalpy_entropy(T, path="../data/thermocalc_raw/FeMnNiCoCu_fcc"):
+def load_gibbs_enthalpy_entropy(T, path="../data/FeMnNiCoCu_fcc"):
     cols = ["x(Mn)", "x(Ni)", "x(Co)", "x(Cu)", "Gm", "Hmr"]
     df = _load_calphad_file(T, path, cols).copy()
     Gi = load_elemental_gibbs_free_energy(T, path)

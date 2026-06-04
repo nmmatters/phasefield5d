@@ -49,13 +49,12 @@ The actual thermodynamic tables are **not included in this repository** (file si
 
 ```
 data/
-└── thermocalc_raw/
-    └── FeMnNiCoCu_fcc/
-        ├── FeMnNiCoCu_fcc_873K.txt        ← tab-separated, one row per composition point
-        └── tchea4_elemental_gibbs_free_energy.csv
+└── FeMnNiCoCu_fcc/
+    ├── FeMnNiCoCu_fcc_873K.txt        ← tab-separated, one row per composition point
+    └── tchea4_elemental_gibbs_free_energy.csv
 ```
 
-See [`data/thermocalc_raw/FeMnNiCoCu_fcc/DATA_FORMAT.md`](data/thermocalc_raw/FeMnNiCoCu_fcc/DATA_FORMAT.md) for the full column specification and how to export compatible tables from ThermoCalc.
+See [`data/FeMnNiCoCu_fcc/DATA_FORMAT.md`](data/FeMnNiCoCu_fcc/DATA_FORMAT.md) for the full column specification and how to export compatible tables from ThermoCalc.
 
 ---
 
@@ -180,7 +179,7 @@ phasefield5d/
 │   └── simulate.py             # Full simulation script (edit and run directly)
 ├── run/
 │   └── launch.py               # Parameter sweep launcher (subprocess-based)
-├── data/                       # NOT in repo — see data/thermocalc_raw/*/DATA_FORMAT.md
+├── data/FeMnNiCoCu_fcc/        # NOT in repo — see data/FeMnNiCoCu_fcc/DATA_FORMAT.md
 ├── logs/                       # Created at runtime by launch.py
 ├── tests/
 │   ├── test_smoke.py           # Geometry, elastic kernels, timestepping (no CALPHAD)
