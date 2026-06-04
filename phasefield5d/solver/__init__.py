@@ -32,7 +32,6 @@ from .system import (                                         # noqa: F401
 from .elastic import (                                        # noqa: F401
     make_elastic_updater,
     build_khachaturyan_kernel,
-    build_cahn_kernel,
     calculate_elastic_potential,
     calculate_linear_elastic_coupling_matrix,
     get_elastic_matrix,

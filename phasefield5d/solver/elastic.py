@@ -19,13 +19,12 @@ def calculate_linear_elastic_coupling_matrix(reference_composition, ri):
     return np.outer(lih, lih)
 
 
-def get_elastic_matrix(composition, vi, ri, c11, c12, c44, theory_tag,
+def get_elastic_matrix(composition, vi, ri, c11, c12, c44,
                        direction=np.array([1, 0, 0])):
-    """Elastic coupling matrix B_n × molar_volume × Λ_αβ  [J/m³]."""
+    """Elastic coupling matrix B_n × molar_volume × Λ_αβ  [J/m³] (Khachaturyan)."""
     molar_volume = calculate_molar_volume(composition, vi)
-    B_n, Y_n = calculate_khachaturyan_elastic_anisotropy(direction, c11, c12, c44)
-    b = Y_n if theory_tag == "cahn" else B_n
-    return calculate_linear_elastic_coupling_matrix(composition, ri) * b * 1e9 * molar_volume
+    B_n, _ = calculate_khachaturyan_elastic_anisotropy(direction, c11, c12, c44)
+    return calculate_linear_elastic_coupling_matrix(composition, ri) * B_n * 1e9 * molar_volume
 
 
 # ---------------------------------------------------------------------------
@@ -54,20 +53,6 @@ def build_khachaturyan_kernel(k_grid, k_norm, c11, c12, c44):
     phi_minus_avg = a / b * (4.0 * (ct - 1.0 / 5.0) + 54.0 * a / d * (c3 - 1.0 / 105.0))
     B_n = np.where(nonzero, -(c11 + 2.0 * c12)**2 / c11 * phi_minus_avg, 0.0)
     return B_n * 1e9
-
-
-def build_cahn_kernel(k_grid, k_norm, c11, c12, c44):
-    """Y(n) kernel in Fourier space [J/m³]."""
-    nonzero = k_norm > 0.0
-    with np.errstate(invalid="ignore", divide="ignore"):
-        n1 = np.where(nonzero, k_grid[0] / k_norm, 0.0)
-        n2 = np.where(nonzero, k_grid[1] / k_norm, 0.0)
-        n3 = np.where(nonzero, k_grid[2] / k_norm, 0.0)
-
-    a = c11 + 2.0 * c12
-    b = n1**2 * n2**2 + n2**2 * n3**2 + n3**2 * n1**2
-    c_ang = 3.0 - a / (c11 + 2.0 * (2.0 * c44 - c11 + c12) * b)
-    return a * c_ang * 1e9
 
 
 # ---------------------------------------------------------------------------

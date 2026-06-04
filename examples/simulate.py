@@ -31,7 +31,6 @@ from phasefield5d.solver.system import (
 from phasefield5d.solver.operators import calculate_laplacian, calculate_gradients_pm
 from phasefield5d.solver.fluxes import get_flux_function
 from phasefield5d.solver.elastic import (
-    build_cahn_kernel,
     build_khachaturyan_kernel,
     calculate_linear_elastic_coupling_matrix,
     make_elastic_updater,
@@ -91,7 +90,7 @@ def main():
         )
         linear_elastic_coupling_matrix *= calculate_molar_volume(cfg.initial_composition, vi)
         elastic_matrix_scalar = get_elastic_matrix(
-            cfg.initial_composition, vi, ri, c11, c12, c44, cfg.theory_tag, cfg.direction
+            cfg.initial_composition, vi, ri, c11, c12, c44, cfg.direction
         )
 
     # -----------------------------------------------------------------------
@@ -144,10 +143,7 @@ def main():
                 number_of_cells[0], number_of_cells[1], number_of_cells[2], cell_size
             )
 
-        if cfg.theory_tag == "cahn":
-            elastic_kernel = build_cahn_kernel(k_grid, k_norm, c11, c12, c44)
-        else:
-            elastic_kernel = build_khachaturyan_kernel(k_grid, k_norm, c11, c12, c44)
+        elastic_kernel = build_khachaturyan_kernel(k_grid, k_norm, c11, c12, c44)
 
     # -----------------------------------------------------------------------
     # Run directory

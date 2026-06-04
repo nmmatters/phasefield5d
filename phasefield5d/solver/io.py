@@ -16,9 +16,9 @@ from phasefield5d.utils.matrix import transform_to_full_element_vector_array
 # Model tag
 # ---------------------------------------------------------------------------
 
-def get_model_tag(atomic_radius_tag, theory_tag, include_cubic_anisotropy, direction, system_dim):
+def get_model_tag(atomic_radius_tag, include_cubic_anisotropy, direction, system_dim):
     if include_cubic_anisotropy:
-        model = f"elastic_cubic_{theory_tag}"
+        model = "elastic_cubic_khachaturyan"
         if system_dim == 1:
             s = "".join(map(str, direction))
             model += f"_direction{s}"
@@ -119,7 +119,7 @@ def _create_subdir(initial_composition, temperature, system_dim=1):
 def _create_run_directory(cfg, number_of_cells, cell_size, time_increment):
     subdir = _create_subdir(cfg.initial_composition, cfg.temperature, system_dim=cfg.system_dim)
     model = get_model_tag(
-        cfg.atomic_radius_tag, cfg.theory_tag,
+        cfg.atomic_radius_tag,
         cfg.include_cubic_anisotropy, cfg.direction, cfg.system_dim,
     )
     model_dir = os.path.join(subdir, model)
@@ -153,7 +153,6 @@ def _write_metadata_json(cfg, run_dir, hessian_max, mobility_max, number_of_cell
         "system_dim":               cfg.system_dim,
         "include_cubic_anisotropy": cfg.include_cubic_anisotropy,
         "direction":                cfg.direction.tolist(),
-        "theory_tag":               cfg.theory_tag,
         "atomic_radius":            cfg.atomic_radius_tag,
         "multiple_wavelength":      cfg.multiple_wavelength,
         "points_per_wavelength":    cfg.points_per_wavelength,

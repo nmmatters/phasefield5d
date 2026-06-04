@@ -96,7 +96,6 @@ simulate-spinodal --temperature 873K --initial_composition 0.1,0.2,0.3,0.2 ...
 | `--kappa_value` | `5e-16` | Gradient energy coefficient κ [J·m²/mol] |
 | `--kappa_i` | `1,1,1,1` | Per-component scaling of κ |
 | `--include_cubic_anisotropy` | `True` | Enable/disable elastic driving force (`--no_include_cubic_anisotropy` to disable) |
-| `--theory_tag` | `khachaturyan` | Elastic energy formulation: `khachaturyan` or `cahn` |
 | `--total_timesteps` | `100 000` | Maximum number of time steps |
 | `--steps_per_ctld` | `1 000` | Target steps per characteristic time of linear decomposition (sets initial Δt) |
 | `--multiple_wavelength` | `100` | System length as multiple of the dominant spinodal wavelength |

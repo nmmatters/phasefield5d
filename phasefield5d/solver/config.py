@@ -46,7 +46,6 @@ class SimulationConfig:
     # elasticity (cubic anisotropy only)
     include_cubic_anisotropy: bool
     direction: np.ndarray  # for 1D: simulation direction; for 2D: plane normal
-    theory_tag: str
     # time scale & adaptivity
     total_timesteps: int
     steps_per_ctld: int
@@ -100,7 +99,6 @@ def build_parser(ncomp: int = 4) -> argparse.ArgumentParser:
 
     elast = p.add_argument_group("elasticity")
     add_bool_flag(elast, "include_cubic_anisotropy", default=True)
-    elast.add_argument("--theory_tag", type=str, default="khachaturyan")
     elast.add_argument("--direction",
                        type=lambda s: np.array(parse_float_list(s, expected_len=3), dtype=int),
                        default="1,0,0")
@@ -150,7 +148,6 @@ def parse_args_to_config(argv: List[str] | None = None, ncomp: int = 4) -> Simul
         kappa_value=float(args.kappa_value),
         kappa_i=np.asarray(args.kappa_i, dtype=float),
         include_cubic_anisotropy=bool(args.include_cubic_anisotropy),
-        theory_tag=str(args.theory_tag),
         direction=np.asarray(args.direction, dtype=int),
         total_timesteps=int(args.total_timesteps),
         steps_per_ctld=int(args.steps_per_ctld),

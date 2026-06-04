@@ -24,7 +24,6 @@ kappa_value_opts          = ["7.6e-15"]
 kappa_i_opts              = [[1, 1, 1, 1]]
 include_cubic_opts        = [True]
 direction_opts            = [[1, 0, 0]]   # for 1D: propagation direction; for 2D: plane normal
-theory_tag                = "khachaturyan"   # "cahn" or "khachaturyan"
 
 # Time / adaptivity / save (single values; turn into lists and add to product to sweep)
 total_timesteps           = 500_000_001
@@ -90,7 +89,6 @@ def _build_cmd(temperature, init_comp, kappa_value, kappa_i,
         "--kappa_i",                   _as_str(kappa_i),
         "--include_cubic_anisotropy"   if include_cubic else "--no_include_cubic_anisotropy",
         "--direction",                 _as_str(direction),
-        "--theory_tag",                theory_tag,
         "--total_timesteps",           str(total_timesteps),
         "--steps_per_ctld",            str(steps_per_ctld),
         "--time_linear_end_multiplier",str(time_linear_end_mult),
