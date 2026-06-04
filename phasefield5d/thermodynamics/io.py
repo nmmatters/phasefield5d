@@ -5,9 +5,13 @@ import pandas as pd
 
 
 def _load_calphad_file(T, path, required_columns):
-    matching = [f for f in os.listdir(path) if str(T) in f]
+    t_lower = str(T).lower()
+    matching = [f for f in os.listdir(path) if t_lower in f.lower()]
     if not matching:
-        raise FileNotFoundError(f"No file containing '{T}' found in {path}")
+        raise FileNotFoundError(
+            f"No file containing '{T}' (case-insensitive) found in {path}\n"
+            f"Files present: {os.listdir(path)}"
+        )
     full_path = os.path.join(path, matching[0])
     print(f"Reading CALPHAD file: {matching[0]}")
     df = pd.read_table(full_path, sep="\t", lineterminator="\n", index_col=False)
