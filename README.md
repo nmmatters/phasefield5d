@@ -83,7 +83,6 @@ Each combination is launched as a separate subprocess with stdout/stderr capture
 Use `-u` for unbuffered output so progress lines appear in the log in real time:
 
 ```bash
-mkdir -p logs
 nohup python -u examples/simulate.py \
     --temperature 873k \
     --initial_composition 0.1,0.2,0.2,0.3 \
