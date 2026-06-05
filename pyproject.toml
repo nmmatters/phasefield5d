@@ -9,6 +9,14 @@ description = "Multi-component Cahn-Hilliard phase-field simulation for Fe-Mn-Ni
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
+authors = [
+    { name = "Niklas Marschall" },
+]
+
+[project.urls]
+Homepage = "https://github.com/nmmatters/phasefield5d"
+Repository = "https://github.com/nmmatters/phasefield5d"
+Issues = "https://github.com/nmmatters/phasefield5d/issues"
 
 dependencies = [
     "numpy>=1.24",

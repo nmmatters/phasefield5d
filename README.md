@@ -11,7 +11,7 @@ Designed for 4+1 component alloy systems (4 independent composition fields + 1 d
 Starting from a homogeneous alloy with small random composition fluctuations, the code time-evolves the coupled Cahn–Hilliard equations using:
 
 - **CALPHAD thermodynamics** — chemical potentials μ(X, T) and mobilities M(X, T) are interpolated from pre-computed ThermoCalc tables
-- **Cubic anisotropic elasticity** — Khachaturyan or Cahn elastic driving force, computed in Fourier space with a rank-1 fast path (one FFT pair regardless of the number of components)
+- **Cubic anisotropic elasticity** — Khachaturyan elastic driving force, computed in Fourier space with a rank-1 fast path (one FFT pair regardless of the number of components)
 - **Adaptive time stepping** — step size controlled by the composition change rate relative to the characteristic time of linear decomposition (CTLD)
 - **1D, 2D, and 3D** periodic simulation domains
 
@@ -22,7 +22,7 @@ Output: time series of composition fields (`.npz`), figures, scalar trace CSV, a
 ## Installation
 
 ```bash
-git clone https://github.com/your-org/phasefield5d.git
+git clone https://github.com/nmmatters/phasefield5d.git
 cd phasefield5d
 pip install -e .
 ```
@@ -114,18 +114,19 @@ simulate-spinodal --temperature 873K --initial_composition 0.1,0.2,0.3,0.2 ...
 
 | Parameter | Default | Description |
 |---|---|---|
+| `--elements` | `Fe,Mn,Ni,Co,Cu` | All 5 elements; first is the dependent component (Fe = 1 − Σ Xᵢ) |
 | `--temperature` | `873K` | Temperature tag; must match filename in CALPHAD data directory |
 | `--data_path` | *(repo)/data/FeMnNiCoCu_fcc* | Path to CALPHAD data directory. Defaults to `data/FeMnNiCoCu_fcc` inside the repo root, resolved relative to the script — not CWD |
-| `--initial_composition` | `0.1,0.2,0.2,0.5` | Mole fractions of the N−1 independent components (Mn, Ni, Co, Cu); Fe = 1 − sum |
+| `--initial_composition` | `0.1,0.2,0.2,0.5` | Mole fractions of the 4 independent components (Mn, Ni, Co, Cu) |
 | `--system_dim` | `1` | Simulation dimensionality: 1, 2, or 3 |
-| `--direction` | `1,0,0` | **1D**: propagation direction. **2D**: plane normal (the simulation plane is perpendicular to this vector). **3D**: ignored |
+| `--direction` | `1,0,0` | **1D**: propagation direction. **2D**: plane normal (simulation plane is perpendicular to this vector). **3D**: ignored |
 | `--kappa_value` | `5e-16` | Gradient energy coefficient κ [J·m²/mol] |
 | `--kappa_i` | `1,1,1,1` | Per-component scaling of κ |
 | `--include_cubic_anisotropy` | `True` | Enable/disable elastic driving force (`--no_include_cubic_anisotropy` to disable) |
 | `--total_timesteps` | `100 000` | Maximum number of time steps |
 | `--steps_per_ctld` | `1 000` | Target steps per characteristic time of linear decomposition (sets initial Δt) |
-| `--multiple_wavelength` | `100` | System length as multiple of the dominant spinodal wavelength |
-| `--points_per_wavelength` | `16` | Spatial resolution: grid points per dominant wavelength |
+| `--mw` | `100` | System length as multiple of the dominant spinodal wavelength |
+| `--ppw` | `16` | Spatial resolution: grid points per dominant wavelength |
 | `--threads` | `1` | Numba parallel threads (optimal ~16 for 3D) |
 | `--fft_workers` | `1` | scipy.fft threads for elastic kernel (`-1` = all cores) |
 | `--atomic_radius_tag` | `senkov` | Atomic radius convention: `senkov`, `kittel`, `riedlich`, `miracle` |
@@ -141,19 +142,26 @@ The materials library supports any combination of the 15 built-in elements:
 
 For elements outside this list, [mendeleev](https://mendeleev.readthedocs.io/) is used as a fallback (install with `pip install mendeleev`).
 
-To run a simulation with a different alloy, modify the material-loading section in `examples/simulate.py`:
+To run a simulation with a different 5-component alloy, pass `--elements` on the command line:
 
-```python
-# Replace the default FeMnNiCoCu loaders:
-from phasefield5d.materials import build_alloy_constants, voigt_elastic_constants
-
-alloy, ri, mu, nu, vi, qi = build_alloy_constants(["Fe", "Cr", "Ni", "Co"], "senkov")
-c11, c12, c44 = voigt_elastic_constants(["Fe", "Cr", "Ni", "Co"], cfg.initial_composition)
+```bash
+python examples/simulate.py \
+    --elements Fe,Cr,Ni,Co,Cu \
+    --temperature 1000k \
+    --initial_composition 0.2,0.2,0.2,0.2 \
+    ...
 ```
 
-`build_alloy_constants` returns the same tuple format as the legacy FeMnNiCoCu loaders, so the rest of the simulation script is unchanged. `voigt_elastic_constants` provides a Voigt (linear) mixing estimate of single-crystal elastic constants from per-element data.
+The CALPHAD column names (`x(Cr)`, `Gm.x(Ni)`, `Mob(Fe)`, …) are derived automatically from `--elements`, so no code changes are needed for the data loader.
 
-> **Note:** The CALPHAD tables (thermodynamic and mobility data) must also be re-generated for the new alloy system in ThermoCalc, and `phasefield5d/thermodynamics/io.py` must be updated to load the appropriate columns.
+For the elastic constants, replace `load_elastic_constants()` in `examples/simulate.py` with a Voigt mixing estimate:
+
+```python
+from phasefield5d.materials import voigt_elastic_constants
+c11, c12, c44 = voigt_elastic_constants(cfg.elements, cfg.initial_composition)
+```
+
+> **Note:** The CALPHAD tables (thermodynamic and mobility data) must be re-generated for the new alloy system in ThermoCalc. The solver is fixed to 5 components (4 independent + 1 dependent); the number of elements cannot be changed without rewriting the 4D interpolation module.
 
 ---
 
@@ -216,23 +224,29 @@ phasefield5d/
 
 ## Output
 
-Each run creates a timestamped directory under the project root, e.g.:
+Each run creates a timestamped directory tree under `results/`:
 
 ```
-results/873K_c10203020_kappa7.6e-15_ki1_1_1_1_cubic1_dir100_khachaturyan_1D/
-├── metadata.json          # All simulation parameters
-├── state_000000000.npz    # Composition field at step 0
-├── state_000001234.npz    # ...subsequent snapshots
-├── snapshot_000001234.png # Quick-look figures
-├── traces.csv             # Step, time, Δt, max ΔX, mass per component
-└── simulation.log         # Copy of stdout/stderr
+results/
+└── Fe60Mn10Ni20Co5Cu5_at_873k_1dim/       ← composition + temperature + dimensionality
+    └── elastic_cubic_direction100/          ← model tag
+        └── cells1600_dx1e-08_..._20250101_120000/
+            ├── metadata.json               # all simulation parameters
+            ├── timeseries_info.csv         # step, time, dt, max ΔX, mass, flux
+            ├── timeseries_info.json        # column schema for the CSV
+            ├── data/
+            │   ├── step_000000000_initial.npz
+            │   └── step_000001234.npz      # composition array + timestep/time/dt
+            └── snapshots/
+                ├── step_000000000_initial.png
+                └── step_000001234.png      # 1D line / 2D colourmap / 3D mid-slice
 ```
 
-`.npz` files store the array `composition` with shape `(Nx[, Ny[, Nz]], n_comp)` and scalar metadata (`timestep`, `time`, `dt`, `cell_size`). These can be converted to VTK for ParaView:
+`.npz` files store `current_composition` with shape `(Nx[, Ny[, Nz]], 4)` and scalar keys `timestep`, `time`, `dt`. These can be converted to VTK for ParaView (3D runs only):
 
 ```python
 from phasefield5d.solver.post_process import batch_npz_to_vti
-batch_npz_to_vti("path/to/run/directory")
+batch_npz_to_vti("path/to/run/data/")
 ```
 
 ---
