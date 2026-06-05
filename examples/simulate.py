@@ -62,14 +62,14 @@ def main():
     # -----------------------------------------------------------------------
     # Material parameters
     # -----------------------------------------------------------------------
-    alloy, ri, mu, nu, vi, qi = load_material_constants(cfg.atomic_radius_tag)
+    alloy, ri, mu, nu, vi, qi = load_material_constants(cfg.atomic_radius_tag, alloy=cfg.elements)
     c11, c12, c44 = load_elastic_constants()
 
     # -----------------------------------------------------------------------
     # CALPHAD data (built once; reused for kinetics and the main loop)
     # -----------------------------------------------------------------------
     data_path = cfg.data_path if cfg.data_path else _DEFAULT_DATA_PATH
-    calphad_dataframe = load_calphad_dataframe(cfg.temperature, path=data_path)
+    calphad_dataframe = load_calphad_dataframe(cfg.temperature, path=data_path, elements=cfg.elements)
     _, data_grid = build_4d_grid(calphad_dataframe, cfg.resolution)
     tree, calphad_values = build_calphad_kdtree(calphad_dataframe)
 

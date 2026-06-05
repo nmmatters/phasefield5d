@@ -15,6 +15,8 @@ from datetime import datetime
 # Sweep configuration — edit these lists
 # ---------------------------------------------------------------------------
 
+elements                  = "Fe,Mn,Ni,Co,Cu"   # first = dependent component
+
 temperature_opts          = ["873K"]
 initial_composition_opts  = [
     [0.1, 0.2, 0.3, 0.2],
@@ -80,6 +82,7 @@ def _build_cmd(temperature, init_comp, kappa_value, kappa_i,
         cmd.append("-u")
     cmd += [
         str(TARGET_SCRIPT),
+        "--elements",                  elements,
         "--temperature",               temperature,
         "--data_path",                 str(data_path),
         "--resolution",                str(resolution),

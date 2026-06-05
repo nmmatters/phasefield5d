@@ -29,6 +29,8 @@ def add_bool_flag(parser, name: str, default: bool = False, help_on: str = "", h
 
 @dataclass
 class SimulationConfig:
+    # alloy
+    elements: List[str]          # all elements, first = dependent (e.g. ["Fe","Mn","Ni","Co","Cu"])
     # thermodynamics
     temperature: str
     data_path: str
@@ -77,6 +79,9 @@ def build_parser(ncomp: int = 4) -> argparse.ArgumentParser:
     )
 
     thermo = p.add_argument_group("thermodynamics")
+    thermo.add_argument("--elements", type=str, default="Fe,Mn,Ni,Co,Cu",
+                        help="Comma-separated element list; first element is the dependent "
+                             "component (e.g. Fe,Mn,Ni,Co,Cu). Sets ncomp = len-1.")
     thermo.add_argument("--temperature", type=str, default="873K")
     thermo.add_argument("--data_path", type=str, default="",
                         help="Path to CALPHAD data directory. Defaults to "
@@ -138,9 +143,17 @@ def build_parser(ncomp: int = 4) -> argparse.ArgumentParser:
     return p
 
 
-def parse_args_to_config(argv: List[str] | None = None, ncomp: int = 4) -> SimulationConfig:
+def parse_args_to_config(argv: List[str] | None = None) -> SimulationConfig:
+    # Pre-parse --elements to derive ncomp before the full parse
+    pre = argparse.ArgumentParser(add_help=False)
+    pre.add_argument("--elements", default="Fe,Mn,Ni,Co,Cu")
+    pre_args, _ = pre.parse_known_args(argv)
+    elements = [e.strip() for e in pre_args.elements.split(",") if e.strip()]
+    ncomp = len(elements) - 1
+
     args = build_parser(ncomp=ncomp).parse_args(argv)
     return SimulationConfig(
+        elements=elements,
         temperature=str(args.temperature),
         data_path=str(args.data_path),
         resolution=float(args.resolution),

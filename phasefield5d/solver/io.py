@@ -113,16 +113,15 @@ def should_save(
 # Directory / metadata creation
 # ---------------------------------------------------------------------------
 
-def _create_subdir(initial_composition, temperature, system_dim=1):
-    subdir = get_composition_label(initial_composition, unicode=False,
-                                   elements=["Fe", "Mn", "Ni", "Co", "Cu"])
+def _create_subdir(initial_composition, temperature, system_dim, elements):
+    subdir = get_composition_label(initial_composition, unicode=False, elements=elements)
     dir_path = _RESULTS_ROOT / f"{subdir}_at_{temperature}_{system_dim}dim"
     dir_path.mkdir(parents=True, exist_ok=True)
     return str(dir_path)
 
 
 def _create_run_directory(cfg, number_of_cells, cell_size, time_increment):
-    subdir = _create_subdir(cfg.initial_composition, cfg.temperature, system_dim=cfg.system_dim)
+    subdir = _create_subdir(cfg.initial_composition, cfg.temperature, cfg.system_dim, cfg.elements)
     model = get_model_tag(
         cfg.atomic_radius_tag,
         cfg.include_cubic_anisotropy, cfg.direction, cfg.system_dim,
@@ -151,6 +150,7 @@ def _write_metadata_json(cfg, run_dir, hessian_max, mobility_max, number_of_cell
                          cell_size, system_length, ctld, wavenumber_max, wavelength_max,
                          time_increment):
     meta = {
+        "elements":                 cfg.elements,
         "temperature":              cfg.temperature,
         "initial_composition":      cfg.initial_composition.tolist(),
         "hessian_max":              hessian_max,
