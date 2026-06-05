@@ -116,7 +116,7 @@ def should_save(
 def _create_subdir(initial_composition, temperature, system_dim=1):
     subdir = get_composition_label(initial_composition, unicode=False,
                                    elements=["Fe", "Mn", "Ni", "Co", "Cu"])
-    dir_path = _RESULTS_ROOT / "cahn_hilliard_dynamics" / f"{subdir}_at_{temperature}_{system_dim}dim"
+    dir_path = _RESULTS_ROOT / f"{subdir}_at_{temperature}_{system_dim}dim"
     dir_path.mkdir(parents=True, exist_ok=True)
     return str(dir_path)
 
