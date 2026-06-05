@@ -71,7 +71,7 @@ class SimulationConfig:
     fft_workers: int
 
 
-def build_parser(ncomp: int = 4) -> argparse.ArgumentParser:
+def build_parser(ncomp: int = 4) -> argparse.ArgumentParser:  # ncomp is always 4; kept for internal use
     p = argparse.ArgumentParser(
         prog="simulate_spinodal",
         description="Run multi-component Cahn–Hilliard / elastic simulation.",
@@ -92,8 +92,8 @@ def build_parser(ncomp: int = 4) -> argparse.ArgumentParser:
 
     comp = p.add_argument_group("composition")
     comp.add_argument("--initial_composition",
-                      type=lambda s: composition_type(s, ncomp=ncomp),
-                      default="0.1,0.2,0.2,0.5" if ncomp == 4 else None)
+                      type=lambda s: composition_type(s, ncomp=4),
+                      default="0.1,0.2,0.2,0.5")
     comp.add_argument("--fluctuation", type=float, default=1e-3)
 
     sysg = p.add_argument_group("system size")
@@ -103,8 +103,8 @@ def build_parser(ncomp: int = 4) -> argparse.ArgumentParser:
     kappa = p.add_argument_group("energy gradient")
     kappa.add_argument("--kappa_value", type=float, default=5e-16)
     kappa.add_argument("--kappa_i",
-                       type=lambda s: np.array(parse_float_list(s, expected_len=ncomp), dtype=float).reshape(1, ncomp),
-                       default="1,1,1,1" if ncomp == 4 else None)
+                       type=lambda s: np.array(parse_float_list(s, expected_len=4), dtype=float).reshape(1, 4),
+                       default="1,1,1,1")
 
     elast = p.add_argument_group("elasticity")
     add_bool_flag(elast, "include_cubic_anisotropy", default=True)
@@ -144,14 +144,13 @@ def build_parser(ncomp: int = 4) -> argparse.ArgumentParser:
 
 
 def parse_args_to_config(argv: List[str] | None = None) -> SimulationConfig:
-    # Pre-parse --elements to derive ncomp before the full parse
-    pre = argparse.ArgumentParser(add_help=False)
-    pre.add_argument("--elements", default="Fe,Mn,Ni,Co,Cu")
-    pre_args, _ = pre.parse_known_args(argv)
-    elements = [e.strip() for e in pre_args.elements.split(",") if e.strip()]
-    ncomp = len(elements) - 1
-
-    args = build_parser(ncomp=ncomp).parse_args(argv)
+    args = build_parser(ncomp=4).parse_args(argv)
+    elements = [e.strip() for e in args.elements.split(",") if e.strip()]
+    if len(elements) != 5:
+        raise ValueError(
+            f"--elements must list exactly 5 elements (got {len(elements)}: {elements}). "
+            "phasefield5d is a 5-component solver; the number of components is fixed."
+        )
     return SimulationConfig(
         elements=elements,
         temperature=str(args.temperature),
