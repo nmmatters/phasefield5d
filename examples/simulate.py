@@ -33,7 +33,10 @@ from phasefield5d.solver.system import (
     build_fourier_grid_3d,
     compute_initial_kinetics,
 )
-from phasefield5d.solver.operators import calculate_laplacian, calculate_gradients_pm, abs_max
+from phasefield5d.solver.operators import (
+    calculate_laplacian, calculate_gradients_pm, abs_max,
+    get_flux_divergence_function,
+)
 from phasefield5d.solver.fluxes import get_flux_function
 from phasefield5d.solver.elastic import (
     build_khachaturyan_kernel,
@@ -206,10 +209,17 @@ def main():
     # -----------------------------------------------------------------------
     # Main loop
     # -----------------------------------------------------------------------
-    # Pre-allocate interpolation output buffer (reused every step)
+    # Pre-allocate ALL per-step work buffers (allocated once, reused every step)
     interpolated_data = np.empty(
         (*current_composition.shape[:-1], data_grid.shape[-1]), dtype=np.float64
     )
+    fluxes_p              = np.empty((dim, *spatial_shape, n_comp), dtype=field_dtype)
+    fluxes_m              = np.empty_like(fluxes_p)
+    composition_change    = np.empty_like(current_composition)
+    mask_buffer           = np.empty(int(np.prod(spatial_shape)), dtype=np.bool_)
+    compute_flux_divergence = get_flux_divergence_function(cfg.system_dim)
+
+    _oob_interval = 100   # out-of-bounds check every N steps (not every step)
 
     composition_change_max = 0.0
     print("Initializing simulation...")
@@ -217,7 +227,7 @@ def main():
     _last_pct = -1
 
     for timestep in range(cfg.total_timesteps):
-        if out_of_bounds(current_composition):
+        if timestep % _oob_interval == 0 and out_of_bounds(current_composition):
             debugging_update(current_composition, timestep, time_increment,
                              composition_change_max, axes_spatial)
             save_current_state(path, timestep, time_increment, time,
@@ -227,36 +237,38 @@ def main():
                                  postfix="_out_of_bound")
             break
 
-        # CALPHAD interpolation
+        # CALPHAD interpolation (writes into pre-alloc buffers)
         interpolator_nb(
             current_composition, data_grid,
             resolution=cfg.resolution,
             tree=tree, calphad_values=calphad_values,
-            out=interpolated_data,
+            out=interpolated_data, mask_buffer=mask_buffer,
         )
 
         chemical_potentials = interpolated_data[..., :n_comp]    # J/mol
         mobilities          = interpolated_data[..., n_comp:]    # m² mol / (J s)
 
-        # Gradient energy contribution (Laplacian term)
-        composition_laplacian = calculate_laplacian(current_composition, cell_size,
-                                                    composition_laplacian)
-        chemical_potentials  -= kappa * composition_laplacian
+        # Gradient energy: Laplacian in-place, then kappa-scale in-place (no temps)
+        calculate_laplacian(current_composition, cell_size, composition_laplacian)
+        composition_laplacian *= kappa             # lap[...,s] *= kappa[s]; no temp
+        chemical_potentials   -= composition_laplacian
 
         # Elastic contribution
         elastic_update(chemical_potentials, current_composition)
 
-        # Flux divergence
-        chemical_potentials_gradient_p, chemical_potentials_gradient_m = calculate_gradients_pm(
+        # Gradients (write into pre-alloc buffers)
+        calculate_gradients_pm(
             chemical_potentials, cell_size,
             chemical_potentials_gradient_p, chemical_potentials_gradient_m,
         )
-        fluxes_p, fluxes_m = compute_fluxes(
+        # Fluxes (write into pre-alloc buffers)
+        compute_fluxes(
             current_composition, mobilities,
             chemical_potentials_gradient_p, chemical_potentials_gradient_m,
+            fluxes_p, fluxes_m,
         )
-
-        composition_change     = np.sum(fluxes_p - fluxes_m, axis=0) * inv_cell_size
+        # Flux divergence into pre-alloc buffer (no fp-fm temporary array)
+        compute_flux_divergence(fluxes_p, fluxes_m, inv_cell_size, composition_change)
         composition_change_max = float(abs_max(composition_change))
 
         # Adaptive time step
@@ -282,19 +294,9 @@ def main():
                   f"[{elapsed/3600:.2f}h elapsed]", flush=True)
             _last_pct = pct
 
-        # Update composition
-        time                += time_increment
-        current_composition += composition_change * time_increment
-
-        # Clamp to simplex (correct numerical drift at X_Fe = 0 boundary)
-        sums     = current_composition.sum(axis=-1)
-        mask_one = sums > 1.0
-        if np.any(mask_one):
-            current_composition[mask_one] /= sums[mask_one, None]
-
-        # Save / trace
+        # Decide save schedule BEFORE modifying composition_change in-place
         save_data, save_snapshot = should_save(
-            timestep, ctld, time, cfg.total_timesteps,
+            timestep, ctld, time + time_increment, cfg.total_timesteps,
             early_frames=cfg.early_stage_frames,
             burst_duration_ctld=cfg.late_burst_duration_ctld,
             burst_frames=cfg.late_burst_frames,
@@ -302,14 +304,29 @@ def main():
             snapshot_factor=10,
         )
         if save_data:
+            # Pre-compute diagnostics while composition_change is still unscaled
             net = np.sum(composition_change, axis=axes_spatial)
+            max_change_per_comp = np.max(np.abs(composition_change), axis=axes_spatial)
+
+        # Update: in-place operations — no temporary arrays
+        time                += time_increment
+        composition_change  *= time_increment   # reuse buffer (overwritten next step)
+        current_composition += composition_change
+
+        # Clamp to simplex (correct numerical drift at X_Fe = 0 boundary)
+        sums     = current_composition.sum(axis=-1)
+        mask_one = sums > 1.0
+        if np.any(mask_one):
+            current_composition[mask_one] /= sums[mask_one, None]
+
+        if save_data:
             mass = np.sum(current_composition, axis=axes_spatial)
             total_flux = np.sum(fluxes_p - fluxes_m, axis=axes_spatial_plus_face)
             save_current_state(path, timestep, time_increment, time, current_composition)
             update_traces(
                 traces, timestep, time, time_increment, time_increment_cfl,
                 net, composition_change_max,
-                np.max(np.abs(composition_change), axis=axes_spatial),
+                max_change_per_comp,
                 mass, total_flux,
             )
         if save_snapshot:

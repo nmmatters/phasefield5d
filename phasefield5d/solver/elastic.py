@@ -10,6 +10,31 @@ from phasefield5d.elasticity.anisotropy import calculate_khachaturyan_elastic_an
 
 
 # ---------------------------------------------------------------------------
+# Numba kernel: misfit contraction  s(x) = Σ_s (X[x,s] - X0[s]) * l[s]
+# Avoids the (*spatial, n_comp) temporary from (X - X0) @ l
+# Falls back to a NumPy expression when Numba is not installed.
+# ---------------------------------------------------------------------------
+
+try:
+    import numba as _nb
+
+    @_nb.njit(parallel=True, fastmath=False)
+    def _dot_misfit_flat(X_flat, X0, l, out_flat):
+        """out_flat[i] = Σ_s (X_flat[i,s] - X0[s]) * l[s]  — no temporary array."""
+        N, S = X_flat.shape
+        for i in _nb.prange(N):
+            acc = 0.0
+            for s in range(S):
+                acc += (X_flat[i, s] - X0[s]) * l[s]
+            out_flat[i] = acc
+
+except ImportError:
+    def _dot_misfit_flat(X_flat, X0, l, out_flat):   # type: ignore[misc]
+        """NumPy fallback (creates a temporary; only used when Numba is absent)."""
+        out_flat[:] = (X_flat - X0) @ l
+
+
+# ---------------------------------------------------------------------------
 # Elastic coupling matrix (composition-space, evaluated at reference X)
 # ---------------------------------------------------------------------------
 
@@ -143,6 +168,7 @@ def make_elastic_updater(cfg, linear_elastic_coupling_matrix, elastic_kernel_r,
         # Fast path: collapse n_comp FFT pairs → 1 scalar FFT pair
         # Λ = outer(v, v)  →  v = eigvec * sqrt(eigenvalue)
         l_vec = (eigvecs[:, -1] * np.sqrt(largest)).astype(field_dtype)
+        _S = n_comp  # captured for reshape inside closure
 
         work_scalar_real = np.empty(spatial_shape, dtype=field_dtype)
         work_scalar_k    = np.empty(k_shape, dtype=np.complex128)
@@ -150,7 +176,12 @@ def make_elastic_updater(cfg, linear_elastic_coupling_matrix, elastic_kernel_r,
 
         def elastic_update(chemical_potentials, composition_field):
             # Scalar contraction  s(x) = v · (X(x) - X₀)
-            work_scalar_real[...] = (composition_field - reference_composition) @ l_vec
+            # _dot_misfit_flat avoids the (*spatial, n_comp) diff temporary
+            _dot_misfit_flat(
+                composition_field.reshape(-1, _S),
+                reference_composition, l_vec,
+                work_scalar_real.reshape(-1),
+            )
 
             # Forward FFT (scalar field only)
             work_scalar_k[...] = _rfftn(work_scalar_real, axes=axes, workers=fft_workers)
@@ -159,9 +190,10 @@ def make_elastic_updater(cfg, linear_elastic_coupling_matrix, elastic_kernel_r,
             work_scalar_k[...] *= elastic_kernel_r
 
             # Backward FFT → multiply by v to distribute across components
+            # np.multiply with out= avoids the (*spatial, n_comp) broadcast temporary
             scalar_r = _irfftn(work_scalar_k, s=spatial_shape, axes=axes,
                                workers=fft_workers).real
-            mu_elastic[...] = scalar_r[..., None] * l_vec
+            np.multiply(scalar_r[..., None], l_vec, out=mu_elastic)
             chemical_potentials[...] += mu_elastic
 
     else:

@@ -7,7 +7,11 @@ def get_flux_function(system_dim):
     """Return a flux function specialised for the given spatial dimension.
 
     The returned callable has signature:
-        fluxes_p, fluxes_m = f(composition, mobilities, grad_mu_p, grad_mu_m)
+        f(composition, mobilities, grad_mu_p, grad_mu_m, fluxes_p, fluxes_m)
+
+    ``fluxes_p`` and ``fluxes_m`` are **pre-allocated output arrays** that are
+    filled in-place.  They must have shape ``(dim, *spatial, n_comp)``.
+    Nothing is returned; all output is via those two buffers.
     """
     if system_dim == 1:
         return _compute_fluxes_pm_1d
@@ -21,17 +25,16 @@ def get_flux_function(system_dim):
 
 @nb.njit(parallel=True, fastmath=False)
 def _compute_fluxes_pm_1d(current_composition, mobilities,
-                           grad_mu_plus, grad_mu_minus):
+                           grad_mu_plus, grad_mu_minus,
+                           fluxes_p, fluxes_m):
     """Numba-parallel flux kernel for 1D.
 
     current_composition : (Nx, S)
     mobilities          : (Nx, S+1)
     grad_mu_plus/minus  : (1, Nx, S)
-    Returns fluxes_p, fluxes_m : (1, Nx, S)
+    fluxes_p, fluxes_m  : (1, Nx, S)  — written in-place, nothing returned
     """
     Nx, S = current_composition.shape
-    fluxes_p = np.empty((1, Nx, S), dtype=current_composition.dtype)
-    fluxes_m = np.empty_like(fluxes_p)
 
     for i in nb.prange(Nx):
         ip = i + 1 if i + 1 < Nx else 0
@@ -45,22 +48,19 @@ def _compute_fluxes_pm_1d(current_composition, mobilities,
         _face_flux(S, Xc, Mc, current_composition[im, :], mobilities[im, :],
                    grad_mu_minus[0, i, :], fluxes_m[0, i, :])
 
-    return fluxes_p, fluxes_m
-
 
 @nb.njit(parallel=True, fastmath=False)
 def _compute_fluxes_pm_2d(current_composition, mobilities,
-                           grad_mu_plus, grad_mu_minus):
+                           grad_mu_plus, grad_mu_minus,
+                           fluxes_p, fluxes_m):
     """Numba-parallel flux kernel for 2D.
 
     current_composition : (Nx, Ny, S)
     mobilities          : (Nx, Ny, S+1)
     grad_mu_plus/minus  : (2, Nx, Ny, S)
-    Returns fluxes_p, fluxes_m : (2, Nx, Ny, S)
+    fluxes_p, fluxes_m  : (2, Nx, Ny, S)  — written in-place, nothing returned
     """
     Nx, Ny, S = current_composition.shape
-    fluxes_p = np.empty((2, Nx, Ny, S), dtype=current_composition.dtype)
-    fluxes_m = np.empty_like(fluxes_p)
 
     for i in nb.prange(Nx):
         ip = i + 1 if i + 1 < Nx else 0
@@ -82,22 +82,19 @@ def _compute_fluxes_pm_2d(current_composition, mobilities,
             _face_flux(S, Xc, Mc, current_composition[i, jm, :], mobilities[i, jm, :],
                        grad_mu_minus[1, i, j, :], fluxes_m[1, i, j, :])
 
-    return fluxes_p, fluxes_m
-
 
 @nb.njit(parallel=True, fastmath=False)
 def _compute_fluxes_pm_3d(current_composition, mobilities,
-                           grad_mu_plus, grad_mu_minus):
+                           grad_mu_plus, grad_mu_minus,
+                           fluxes_p, fluxes_m):
     """Numba-parallel flux kernel for 3D.
 
     current_composition : (Nx, Ny, Nz, S)
     mobilities          : (Nx, Ny, Nz, S+1)
     grad_mu_plus/minus  : (3, Nx, Ny, Nz, S)
-    Returns fluxes_p, fluxes_m : (3, Nx, Ny, Nz, S)
+    fluxes_p, fluxes_m  : (3, Nx, Ny, Nz, S)  — written in-place, nothing returned
     """
     Nx, Ny, Nz, S = current_composition.shape
-    fluxes_p = np.empty((3, Nx, Ny, Nz, S), dtype=current_composition.dtype)
-    fluxes_m = np.empty_like(fluxes_p)
 
     for i in nb.prange(Nx):
         ip = i + 1 if i + 1 < Nx else 0
@@ -126,8 +123,6 @@ def _compute_fluxes_pm_3d(current_composition, mobilities,
                            grad_mu_plus[2, i, j, k, :], fluxes_p[2, i, j, k, :])
                 _face_flux(S, Xc, Mc, current_composition[i, j, km, :], mobilities[i, j, km, :],
                            grad_mu_minus[2, i, j, k, :], fluxes_m[2, i, j, k, :])
-
-    return fluxes_p, fluxes_m
 
 
 @nb.njit(fastmath=False)

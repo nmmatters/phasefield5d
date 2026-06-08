@@ -1,4 +1,11 @@
-"""Midpoint mobility arrays and dyadic mobility matrix for the CH flux."""
+"""Midpoint mobility arrays and dyadic mobility matrix for the CH flux.
+
+NOTE: ``calculate_mobility_matrix_pm`` and ``midpoint_arrays`` are NOT used in
+the main simulation loop.  The Numba flux kernels in ``fluxes.py`` compute face
+midpoints inline, which is faster and avoids the ``np.roll`` copies in the 1D/2D
+path here.  These functions are kept for backward compatibility with existing
+tests and any external code that calls them directly.
+"""
 import numpy as np
 import numba as nb
 
@@ -9,6 +16,10 @@ def midpoint_arrays(array):
     For 3D arrays uses a Numba-parallel kernel; for 1D and 2D uses NumPy roll.
 
     Returns (forward_mid, backward_mid) each with shape (n_dims, *spatial, n_comp).
+
+    .. deprecated::
+        Not used in the main loop.  The Numba flux kernels (``fluxes.py``)
+        compute midpoints inline without ``np.roll``.
     """
     spatial_dims = array.ndim - 1
     if spatial_dims == 3:

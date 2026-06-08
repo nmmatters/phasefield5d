@@ -175,6 +175,60 @@ def abs_max(arr):
     return m
 
 
+# ---------------------------------------------------------------------------
+# Flux divergence  Σ_d (flux_plus[d,...] - flux_minus[d,...]) * inv_dx
+# Single-pass kernel: avoids the (fp − fm) temporary array
+# ---------------------------------------------------------------------------
+
+@nb.njit(parallel=True, fastmath=False)
+def flux_divergence_1d(fp, fm, inv_dx, out):
+    """out[i,s] = (fp[0,i,s] - fm[0,i,s]) * inv_dx — no temporary array."""
+    Nx, S = out.shape
+    for i in nb.prange(Nx):
+        for s in range(S):
+            out[i, s] = (fp[0, i, s] - fm[0, i, s]) * inv_dx
+
+
+@nb.njit(parallel=True, fastmath=False)
+def flux_divergence_2d(fp, fm, inv_dx, out):
+    """out[i,j,s] = Σ_d(fp[d,...] - fm[d,...]) * inv_dx — no temporary array."""
+    Nx, Ny, S = out.shape
+    for i in nb.prange(Nx):
+        for j in range(Ny):
+            for s in range(S):
+                out[i, j, s] = (
+                    fp[0, i, j, s] - fm[0, i, j, s] +
+                    fp[1, i, j, s] - fm[1, i, j, s]
+                ) * inv_dx
+
+
+@nb.njit(parallel=True, fastmath=False)
+def flux_divergence_3d(fp, fm, inv_dx, out):
+    """out[i,j,k,s] = Σ_d(fp[d,...] - fm[d,...]) * inv_dx — no temporary array."""
+    Nx, Ny, Nz, S = out.shape
+    for i in nb.prange(Nx):
+        for j in range(Ny):
+            for k in range(Nz):
+                for s in range(S):
+                    out[i, j, k, s] = (
+                        fp[0, i, j, k, s] - fm[0, i, j, k, s] +
+                        fp[1, i, j, k, s] - fm[1, i, j, k, s] +
+                        fp[2, i, j, k, s] - fm[2, i, j, k, s]
+                    ) * inv_dx
+
+
+def get_flux_divergence_function(system_dim):
+    """Return the flux-divergence kernel for the given spatial dimension."""
+    if system_dim == 1:
+        return flux_divergence_1d
+    elif system_dim == 2:
+        return flux_divergence_2d
+    elif system_dim == 3:
+        return flux_divergence_3d
+    else:
+        raise ValueError(f"Unsupported system_dim={system_dim}. Choose 1, 2, or 3.")
+
+
 @nb.njit(parallel=True, fastmath=False)
 def gradients_pm_3d(c, dx, grad_plus, grad_minus):
     Nx, Ny, Nz, n_comp = c.shape

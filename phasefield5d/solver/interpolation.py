@@ -61,6 +61,25 @@ def linear_mask(composition_array, resolution):
 
 
 # ---------------------------------------------------------------------------
+# Numba mask: Σ comp[i,:] <= threshold  (avoids two numpy temporaries)
+# ---------------------------------------------------------------------------
+
+@njit(parallel=True, fastmath=False)
+def _compute_linear_mask(comp_flat, threshold, mask_flat):
+    """mask_flat[i] = True iff Σ_d comp_flat[i, d] <= threshold.
+
+    Single-pass kernel — eliminates the float sum array AND the bool comparison
+    array that ``linear_mask`` would allocate.
+    """
+    N, S = comp_flat.shape
+    for i in prange(N):
+        s = 0.0
+        for d in range(S):
+            s += comp_flat[i, d]
+        mask_flat[i] = s <= threshold
+
+
+# ---------------------------------------------------------------------------
 # Numba 4D linear interpolation kernel
 # ---------------------------------------------------------------------------
 
@@ -119,7 +138,8 @@ def interpolate_grid_4d_linear(comp_flat, grid, step, out_flat, mask_lin_flat):
 # ---------------------------------------------------------------------------
 
 def interpolator_nb(composition_array, data_grid, resolution,
-                    tree, calphad_values, max_nn_dist=None, out=None):
+                    tree, calphad_values, max_nn_dist=None, out=None,
+                    mask_buffer=None):
     """Numba-accelerated 4D grid interpolation with KD-tree fallback.
 
     Parameters
@@ -138,6 +158,10 @@ def interpolator_nb(composition_array, data_grid, resolution,
         Pre-allocated output array of shape (..., n_props) float64.
         If provided, results are written in-place and the same array is
         returned — avoiding a fresh allocation on every call.
+    mask_buffer : ndarray of bool or None
+        Pre-allocated 1D boolean work array of length prod(spatial_shape).
+        If provided, the linear-interpolation mask is computed into it with a
+        Numba kernel, eliminating two NumPy temporaries (float sum + bool compare).
     """
     comp = np.asarray(composition_array, dtype=np.float64)
     spatial_shape = comp.shape[:-1]
@@ -147,8 +171,15 @@ def interpolator_nb(composition_array, data_grid, resolution,
         out = np.empty((*spatial_shape, n_props), dtype=np.float64)
 
     comp_flat = comp.reshape(-1, 4)
-    out_flat = out.reshape(-1, n_props)
-    mask_lin_flat = linear_mask(comp, resolution).reshape(-1)
+    out_flat  = out.reshape(-1, n_props)
+
+    if mask_buffer is None:
+        mask_lin_flat = np.empty(comp_flat.shape[0], dtype=np.bool_)
+    else:
+        mask_lin_flat = mask_buffer
+
+    threshold = 1.0 - 4.0 * resolution - 1e-9
+    _compute_linear_mask(comp_flat, threshold, mask_lin_flat)
 
     interpolate_grid_4d_linear(comp_flat, data_grid, resolution, out_flat, mask_lin_flat)
 
