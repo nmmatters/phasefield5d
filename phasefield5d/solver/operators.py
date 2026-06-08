@@ -154,6 +154,27 @@ def gradients_pm_2d(c, dx, grad_plus, grad_minus):
                 grad_minus[1, i, j, s] = (center - c[i, jm, s]) * inv_dx
 
 
+# ---------------------------------------------------------------------------
+# Scalar reductions
+# ---------------------------------------------------------------------------
+
+@nb.njit(fastmath=False)
+def abs_max(arr):
+    """Return the maximum absolute value over all elements of arr.
+
+    Single-pass, allocation-free reduction — avoids the temporary array that
+    ``np.abs(arr).max()`` would create.  Works on any shape; uses a flattened
+    view internally (no copy for C-contiguous input).
+    """
+    flat = arr.ravel()
+    m = 0.0
+    for i in range(flat.shape[0]):
+        v = abs(flat[i])
+        if v > m:
+            m = v
+    return m
+
+
 @nb.njit(parallel=True, fastmath=False)
 def gradients_pm_3d(c, dx, grad_plus, grad_minus):
     Nx, Ny, Nz, n_comp = c.shape

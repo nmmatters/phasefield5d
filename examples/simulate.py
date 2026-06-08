@@ -33,7 +33,7 @@ from phasefield5d.solver.system import (
     build_fourier_grid_3d,
     compute_initial_kinetics,
 )
-from phasefield5d.solver.operators import calculate_laplacian, calculate_gradients_pm
+from phasefield5d.solver.operators import calculate_laplacian, calculate_gradients_pm, abs_max
 from phasefield5d.solver.fluxes import get_flux_function
 from phasefield5d.solver.elastic import (
     build_khachaturyan_kernel,
@@ -257,8 +257,7 @@ def main():
         )
 
         composition_change     = np.sum(fluxes_p - fluxes_m, axis=0) * inv_cell_size
-        change_abs             = np.abs(composition_change)
-        composition_change_max = float(np.nanmax(change_abs))
+        composition_change_max = float(abs_max(composition_change))
 
         # Adaptive time step
         if time > time_linear_end and ctld_flag:
@@ -310,7 +309,7 @@ def main():
             update_traces(
                 traces, timestep, time, time_increment, time_increment_cfl,
                 net, composition_change_max,
-                np.nanmax(change_abs, axis=axes_spatial),
+                np.max(np.abs(composition_change), axis=axes_spatial),
                 mass, total_flux,
             )
         if save_snapshot:
