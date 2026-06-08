@@ -13,28 +13,49 @@ def calculate_laplacian(array, cell_size, out=None):
     array : (...spatial..., n_comp)
     Returns out with same shape (allocated if not provided).
     """
-    spatial_dims = array.ndim - 1
     if out is None:
         out = np.empty_like(array)
 
-    if spatial_dims == 3:
-        laplacian_3d(array, cell_size, out)
+    spatial_dims = array.ndim - 1
+    if spatial_dims == 1:
+        laplacian_1d(array, cell_size, out)
     elif spatial_dims == 2:
-        inv_dx2 = 1.0 / (cell_size * cell_size)
-        out[...] = (
-            np.roll(array, -1, axis=0) + np.roll(array,  1, axis=0)
-            + np.roll(array, -1, axis=1) + np.roll(array,  1, axis=1)
-            - 4.0 * array
-        ) * inv_dx2
-    elif spatial_dims == 1:
-        inv_dx2 = 1.0 / (cell_size * cell_size)
-        out[...] = (
-            np.roll(array, -1, axis=0) - 2.0 * array + np.roll(array, 1, axis=0)
-        ) * inv_dx2
+        laplacian_2d(array, cell_size, out)
+    elif spatial_dims == 3:
+        laplacian_3d(array, cell_size, out)
     else:
         raise NotImplementedError(f"Laplacian not implemented for spatial_dims={spatial_dims}")
 
     return out
+
+
+@nb.njit(parallel=True, fastmath=False)
+def laplacian_1d(c, dx, out):
+    Nx, n_comp = c.shape
+    inv_dx2 = 1.0 / (dx * dx)
+    for i in nb.prange(Nx):
+        ip = i + 1 if i + 1 < Nx else 0
+        im = i - 1 if i - 1 >= 0 else Nx - 1
+        for s in range(n_comp):
+            out[i, s] = (c[ip, s] + c[im, s] - 2.0 * c[i, s]) * inv_dx2
+
+
+@nb.njit(parallel=True, fastmath=False)
+def laplacian_2d(c, dx, out):
+    Nx, Ny, n_comp = c.shape
+    inv_dx2 = 1.0 / (dx * dx)
+    for i in nb.prange(Nx):
+        ip = i + 1 if i + 1 < Nx else 0
+        im = i - 1 if i - 1 >= 0 else Nx - 1
+        for j in range(Ny):
+            jp = j + 1 if j + 1 < Ny else 0
+            jm = j - 1 if j - 1 >= 0 else Ny - 1
+            for s in range(n_comp):
+                out[i, j, s] = (
+                    c[ip, j, s] + c[im, j, s] +
+                    c[i, jp, s] + c[i, jm, s]
+                    - 4.0 * c[i, j, s]
+                ) * inv_dx2
 
 
 @nb.njit(parallel=True, fastmath=False)
@@ -72,13 +93,13 @@ def calculate_gradients_pm(array, cell_size, grad_p=None, grad_m=None):
     """
     spatial_dims = array.ndim - 1
 
-    if spatial_dims == 3:
-        Nx, Ny, Nz, n_comp = array.shape
+    if spatial_dims == 1:
+        Nx, n_comp = array.shape
         if grad_p is None:
-            grad_p = np.empty((3, Nx, Ny, Nz, n_comp), dtype=array.dtype)
+            grad_p = np.empty((1, Nx, n_comp), dtype=array.dtype)
         if grad_m is None:
             grad_m = np.empty_like(grad_p)
-        gradients_pm_3d(array, cell_size, grad_p, grad_m)
+        gradients_pm_1d(array, cell_size, grad_p, grad_m)
 
     elif spatial_dims == 2:
         Nx, Ny, n_comp = array.shape
@@ -86,26 +107,51 @@ def calculate_gradients_pm(array, cell_size, grad_p=None, grad_m=None):
             grad_p = np.empty((2, Nx, Ny, n_comp), dtype=array.dtype)
         if grad_m is None:
             grad_m = np.empty_like(grad_p)
-        inv_dx = 1.0 / cell_size
-        grad_p[0] = (np.roll(array, -1, axis=0) - array) * inv_dx
-        grad_m[0] = (array - np.roll(array,  1, axis=0)) * inv_dx
-        grad_p[1] = (np.roll(array, -1, axis=1) - array) * inv_dx
-        grad_m[1] = (array - np.roll(array,  1, axis=1)) * inv_dx
+        gradients_pm_2d(array, cell_size, grad_p, grad_m)
 
-    elif spatial_dims == 1:
-        Nx, n_comp = array.shape
+    elif spatial_dims == 3:
+        Nx, Ny, Nz, n_comp = array.shape
         if grad_p is None:
-            grad_p = np.empty((1, Nx, n_comp), dtype=array.dtype)
+            grad_p = np.empty((3, Nx, Ny, Nz, n_comp), dtype=array.dtype)
         if grad_m is None:
             grad_m = np.empty_like(grad_p)
-        inv_dx = 1.0 / cell_size
-        grad_p[0] = (np.roll(array, -1, axis=0) - array) * inv_dx
-        grad_m[0] = (array - np.roll(array,  1, axis=0)) * inv_dx
+        gradients_pm_3d(array, cell_size, grad_p, grad_m)
 
     else:
         raise NotImplementedError(f"Gradients not implemented for spatial_dims={spatial_dims}")
 
     return grad_p, grad_m
+
+
+@nb.njit(parallel=True, fastmath=False)
+def gradients_pm_1d(c, dx, grad_plus, grad_minus):
+    Nx, n_comp = c.shape
+    inv_dx = 1.0 / dx
+    for i in nb.prange(Nx):
+        ip = i + 1 if i + 1 < Nx else 0
+        im = i - 1 if i - 1 >= 0 else Nx - 1
+        for s in range(n_comp):
+            center = c[i, s]
+            grad_plus[0, i, s]  = (c[ip, s] - center) * inv_dx
+            grad_minus[0, i, s] = (center - c[im, s]) * inv_dx
+
+
+@nb.njit(parallel=True, fastmath=False)
+def gradients_pm_2d(c, dx, grad_plus, grad_minus):
+    Nx, Ny, n_comp = c.shape
+    inv_dx = 1.0 / dx
+    for i in nb.prange(Nx):
+        ip = i + 1 if i + 1 < Nx else 0
+        im = i - 1 if i - 1 >= 0 else Nx - 1
+        for j in range(Ny):
+            jp = j + 1 if j + 1 < Ny else 0
+            jm = j - 1 if j - 1 >= 0 else Ny - 1
+            for s in range(n_comp):
+                center = c[i, j, s]
+                grad_plus[0, i, j, s]  = (c[ip, j, s] - center) * inv_dx
+                grad_minus[0, i, j, s] = (center - c[im, j, s]) * inv_dx
+                grad_plus[1, i, j, s]  = (c[i, jp, s] - center) * inv_dx
+                grad_minus[1, i, j, s] = (center - c[i, jm, s]) * inv_dx
 
 
 @nb.njit(parallel=True, fastmath=False)
