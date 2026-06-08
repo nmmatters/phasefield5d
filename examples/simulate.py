@@ -274,7 +274,7 @@ def main():
             elapsed = runtime.perf_counter() - start_time
             print(f"  {pct:3d}%  step {timestep:>10d}  t={time:.3e} s  "
                   f"dt={time_increment:.2e} s  max_dX={composition_change_max:.2e}  "
-                  f"[{elapsed:.0f}s elapsed]", flush=True)
+                  f"[{elapsed/3600:.2f}h elapsed]", flush=True)
             _last_pct = pct
 
         # Update composition
