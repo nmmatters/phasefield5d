@@ -10,12 +10,12 @@ from numba import njit, prange
 # Grid construction
 # ---------------------------------------------------------------------------
 
-def build_4d_grid(original_data, resolution, dtype=np.float32):
+def build_4d_grid(original_data, resolution, dtype=np.float64):
     """Map CALPHAD DataFrame onto a uniform 4D grid (composition axes).
 
     Returns (xdim, grid) where:
       xdim  : 1D coordinate array [0, 1] with spacing `resolution`
-      grid  : (num, num, num, num, n_props) array of float32
+      grid  : (num, num, num, num, n_props) array of float64
     """
     data = original_data.to_numpy() if hasattr(original_data, "to_numpy") else np.asarray(original_data)
     n_props = data[:, 4:].shape[-1]

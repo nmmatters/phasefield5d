@@ -227,7 +227,7 @@ def main():
             current_composition, data_grid,
             resolution=cfg.resolution,
             tree=tree, calphad_values=calphad_values,
-        ).astype(field_dtype, copy=False)
+        )
 
         chemical_potentials = interpolated_data[..., :n_comp]    # J/mol
         mobilities          = interpolated_data[..., n_comp:]    # m² mol / (J s)
