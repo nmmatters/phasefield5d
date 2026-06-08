@@ -119,14 +119,14 @@ def interpolate_grid_4d_linear(comp_flat, grid, step, out_flat, mask_lin_flat):
 # ---------------------------------------------------------------------------
 
 def interpolator_nb(composition_array, data_grid, resolution,
-                    tree, calphad_values, max_nn_dist=None):
+                    tree, calphad_values, max_nn_dist=None, out=None):
     """Numba-accelerated 4D grid interpolation with KD-tree fallback.
 
     Parameters
     ----------
     composition_array : (..., 4) float64
         Composition field.
-    data_grid : (num, num, num, num, n_props) float32
+    data_grid : (num, num, num, num, n_props) float64
         Grid from build_4d_grid.
     resolution : float
         Grid spacing.
@@ -134,12 +134,18 @@ def interpolator_nb(composition_array, data_grid, resolution,
     calphad_values : (N, n_props) float64
     max_nn_dist : float or None
         If set, raise if nearest-neighbour distance exceeds this value.
+    out : ndarray or None
+        Pre-allocated output array of shape (..., n_props) float64.
+        If provided, results are written in-place and the same array is
+        returned — avoiding a fresh allocation on every call.
     """
     comp = np.asarray(composition_array, dtype=np.float64)
     spatial_shape = comp.shape[:-1]
     n_props = data_grid.shape[4]
 
-    out = np.empty((*spatial_shape, n_props), dtype=np.float64)
+    if out is None:
+        out = np.empty((*spatial_shape, n_props), dtype=np.float64)
+
     comp_flat = comp.reshape(-1, 4)
     out_flat = out.reshape(-1, n_props)
     mask_lin_flat = linear_mask(comp, resolution).reshape(-1)
@@ -154,7 +160,7 @@ def interpolator_nb(composition_array, data_grid, resolution,
             raise RuntimeError("Some compositions are outside the CALPHAD domain (KD-tree).")
         out_flat[mask_nan] = calphad_values[idx]
 
-    return out_flat.reshape(*spatial_shape, n_props)
+    return out
 
 
 def interpolator(composition_array, linear_interpolator, nearest_interpolator,

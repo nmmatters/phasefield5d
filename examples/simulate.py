@@ -206,6 +206,11 @@ def main():
     # -----------------------------------------------------------------------
     # Main loop
     # -----------------------------------------------------------------------
+    # Pre-allocate interpolation output buffer (reused every step)
+    interpolated_data = np.empty(
+        (*current_composition.shape[:-1], data_grid.shape[-1]), dtype=np.float64
+    )
+
     composition_change_max = 0.0
     print("Initializing simulation...")
     start_time = runtime.perf_counter()
@@ -223,10 +228,11 @@ def main():
             break
 
         # CALPHAD interpolation
-        interpolated_data = interpolator_nb(
+        interpolator_nb(
             current_composition, data_grid,
             resolution=cfg.resolution,
             tree=tree, calphad_values=calphad_values,
+            out=interpolated_data,
         )
 
         chemical_potentials = interpolated_data[..., :n_comp]    # J/mol
