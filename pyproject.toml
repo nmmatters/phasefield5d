@@ -34,8 +34,14 @@ dev = [
 materials = [
     "mendeleev>=0.14",
 ]
+fast = [
+    # Pre-allocated FFTW plans eliminate ~98 MB/step of FFT output allocation
+    # when elastic anisotropy is enabled.  Install with:  pip install pyfftw
+    "pyfftw>=0.13",
+]
 all = [
     "mendeleev>=0.14",
+    "pyfftw>=0.13",
     "pytest>=7",
     "pytest-cov",
 ]

@@ -35,9 +35,9 @@ from phasefield5d.solver.system import (
 )
 from phasefield5d.solver.operators import (
     calculate_laplacian, calculate_gradients_pm, abs_max,
-    get_flux_divergence_function,
+    clamp_simplex,
 )
-from phasefield5d.solver.fluxes import get_flux_function
+from phasefield5d.solver.fluxes import get_flux_function, get_divergence_from_mu_function
 from phasefield5d.solver.elastic import (
     build_khachaturyan_kernel,
     calculate_linear_elastic_coupling_matrix,
@@ -217,7 +217,8 @@ def main():
     fluxes_m              = np.empty_like(fluxes_p)
     composition_change    = np.empty_like(current_composition)
     mask_buffer           = np.empty(int(np.prod(spatial_shape)), dtype=np.bool_)
-    compute_flux_divergence = get_flux_divergence_function(cfg.system_dim)
+    # Fully fused gradient+flux+divergence kernel — no gp/gm/fp/fm stored in hot path
+    compute_divergence_from_mu = get_divergence_from_mu_function(cfg.system_dim)
 
     _oob_interval = 100   # out-of-bounds check every N steps (not every step)
 
@@ -256,19 +257,11 @@ def main():
         # Elastic contribution
         elastic_update(chemical_potentials, current_composition)
 
-        # Gradients (write into pre-alloc buffers)
-        calculate_gradients_pm(
-            chemical_potentials, cell_size,
-            chemical_potentials_gradient_p, chemical_potentials_gradient_m,
-        )
-        # Fluxes (write into pre-alloc buffers)
-        compute_fluxes(
+        # Fully fused gradient+flux+divergence: reads mu directly, no gp/gm/fp/fm stored
+        compute_divergence_from_mu(
             current_composition, mobilities,
-            chemical_potentials_gradient_p, chemical_potentials_gradient_m,
-            fluxes_p, fluxes_m,
+            chemical_potentials, inv_cell_size, composition_change,
         )
-        # Flux divergence into pre-alloc buffer (no fp-fm temporary array)
-        compute_flux_divergence(fluxes_p, fluxes_m, inv_cell_size, composition_change)
         composition_change_max = float(abs_max(composition_change))
 
         # Adaptive time step
@@ -307,27 +300,57 @@ def main():
             # Pre-compute diagnostics while composition_change is still unscaled
             net = np.sum(composition_change, axis=axes_spatial)
             max_change_per_comp = np.max(np.abs(composition_change), axis=axes_spatial)
+            # Fill gp/gm then fp/fm for total_flux diagnostic (save steps only — rare)
+            calculate_gradients_pm(
+                chemical_potentials, cell_size,
+                chemical_potentials_gradient_p, chemical_potentials_gradient_m,
+            )
+            compute_fluxes(
+                current_composition, mobilities,
+                chemical_potentials_gradient_p, chemical_potentials_gradient_m,
+                fluxes_p, fluxes_m,
+            )
 
         # Update: in-place operations — no temporary arrays
         time                += time_increment
         composition_change  *= time_increment   # reuse buffer (overwritten next step)
         current_composition += composition_change
 
-        # Clamp to simplex (correct numerical drift at X_Fe = 0 boundary)
-        sums     = current_composition.sum(axis=-1)
-        mask_one = sums > 1.0
-        if np.any(mask_one):
-            current_composition[mask_one] /= sums[mask_one, None]
+        # Clamp to simplex — single Numba pass, no sum/mask temporaries
+        clamp_simplex(current_composition)
 
         if save_data:
             mass = np.sum(current_composition, axis=axes_spatial)
             total_flux = np.sum(fluxes_p - fluxes_m, axis=axes_spatial_plus_face)
+
+            # --- accuracy / stability diagnostics (items 1-4) ---
+            # item 1: composition bounds (independent components + Fe)
+            comp_min = np.min(current_composition, axis=axes_spatial)   # shape (n_comp,)
+            comp_max = np.max(current_composition, axis=axes_spatial)   # shape (n_comp,)
+            # X_Fe = 1 - sum_s X_s; its minimum is 1 minus the spatial max of the sum
+            comp_fe_min = 1.0 - float(np.max(current_composition.sum(axis=-1)))
+
+            # item 2: per-component composition variance — spinodal amplitude signal
+            comp_var = np.var(current_composition, axis=axes_spatial)   # shape (n_comp,)
+
+            # item 3: gradient (interfacial) energy proxy
+            #   f_grad = ∫ (κ/2)|∇X|² dV  = −(dx^dim / 2) Σ_voxel X · κ∇²X
+            #   (integration by parts, periodic BCs)
+            # Recompute κ∇²X for the post-update composition (rare save-step cost;
+            # composition_laplacian is stale and will be overwritten next iteration anyway).
+            calculate_laplacian(current_composition, cell_size, composition_laplacian)
+            composition_laplacian *= kappa
+            f_grad = -0.5 * (cell_size ** dim) * float(
+                np.sum(current_composition * composition_laplacian)
+            )
+
             save_current_state(path, timestep, time_increment, time, current_composition)
             update_traces(
                 traces, timestep, time, time_increment, time_increment_cfl,
                 net, composition_change_max,
                 max_change_per_comp,
                 mass, total_flux,
+                comp_min, comp_max, comp_fe_min, comp_var, f_grad,
             )
         if save_snapshot:
             save_snapshot_figure(path, timestep, time, current_composition,

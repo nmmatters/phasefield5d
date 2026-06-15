@@ -100,37 +100,51 @@ def interpolate_grid_4d_linear(comp_flat, grid, step, out_flat, mask_lin_flat):
                 out_flat[idx, p] = np.nan
             continue
 
-        # Map to grid coordinates
-        u = np.empty(4, dtype=np.float64)
-        for d in range(4):
-            u[d] = comp_flat[idx, d] * inv_step
+        # Map to grid coordinates — scalars give LLVM more scheduling freedom
+        u0 = comp_flat[idx, 0] * inv_step
+        u1 = comp_flat[idx, 1] * inv_step
+        u2 = comp_flat[idx, 2] * inv_step
+        u3 = comp_flat[idx, 3] * inv_step
 
-        # Floor indices and interpolation weights
-        i_base = np.empty(4, dtype=np.int64)
-        t = np.empty(4, dtype=np.float64)
-        for d in range(4):
-            if u[d] <= 0.0:
-                i_base[d] = 0; t[d] = 0.0
-            elif u[d] >= num - 1:
-                i_base[d] = num - 2; t[d] = 1.0
-            else:
-                i_base[d] = int(u[d]); t[d] = u[d] - i_base[d]
+        # Floor indices and fractional weights — one branch per dimension
+        if u0 <= 0.0:       i0 = 0;       t0 = 0.0
+        elif u0 >= num - 1: i0 = num - 2; t0 = 1.0
+        else:               i0 = int(u0); t0 = u0 - i0
+        if u1 <= 0.0:       i1 = 0;       t1 = 0.0
+        elif u1 >= num - 1: i1 = num - 2; t1 = 1.0
+        else:               i1 = int(u1); t1 = u1 - i1
+        if u2 <= 0.0:       i2 = 0;       t2 = 0.0
+        elif u2 >= num - 1: i2 = num - 2; t2 = 1.0
+        else:               i2 = int(u2); t2 = u2 - i2
+        if u3 <= 0.0:       i3 = 0;       t3 = 0.0
+        elif u3 >= num - 1: i3 = num - 2; t3 = 1.0
+        else:               i3 = int(u3); t3 = u3 - i3
 
-        i0, i1, i2, i3 = i_base[0], i_base[1], i_base[2], i_base[3]
-        t0, t1, t2, t3 = t[0], t[1], t[2], t[3]
+        # Precompute all 16 corner weights outside the property loop — eliminates
+        # 576 conditional branches per point (4 nested loops × 9 properties × 4 dims)
+        # and makes the inner p-loop a pure FMA sequence over known scalars.
+        s0 = 1.0 - t0;  s1 = 1.0 - t1;  s2 = 1.0 - t2;  s3 = 1.0 - t3
+        c0000 = s0 * s1 * s2 * s3;  c0001 = s0 * s1 * s2 * t3
+        c0010 = s0 * s1 * t2 * s3;  c0011 = s0 * s1 * t2 * t3
+        c0100 = s0 * t1 * s2 * s3;  c0101 = s0 * t1 * s2 * t3
+        c0110 = s0 * t1 * t2 * s3;  c0111 = s0 * t1 * t2 * t3
+        c1000 = t0 * s1 * s2 * s3;  c1001 = t0 * s1 * s2 * t3
+        c1010 = t0 * s1 * t2 * s3;  c1011 = t0 * s1 * t2 * t3
+        c1100 = t0 * t1 * s2 * s3;  c1101 = t0 * t1 * s2 * t3
+        c1110 = t0 * t1 * t2 * s3;  c1111 = t0 * t1 * t2 * t3
+        i0_ = i0 + 1;  i1_ = i1 + 1;  i2_ = i2 + 1;  i3_ = i3 + 1
 
         for p in range(n_props):
-            val = 0.0
-            for b0 in range(2):
-                w0 = (1.0 - t0) if b0 == 0 else t0
-                for b1 in range(2):
-                    w1 = (1.0 - t1) if b1 == 0 else t1
-                    for b2 in range(2):
-                        w2 = (1.0 - t2) if b2 == 0 else t2
-                        for b3 in range(2):
-                            w3 = (1.0 - t3) if b3 == 0 else t3
-                            val += w0 * w1 * w2 * w3 * grid[i0+b0, i1+b1, i2+b2, i3+b3, p]
-            out_flat[idx, p] = val
+            out_flat[idx, p] = (
+                c0000 * grid[i0,  i1,  i2,  i3,  p] + c0001 * grid[i0,  i1,  i2,  i3_, p] +
+                c0010 * grid[i0,  i1,  i2_, i3,  p] + c0011 * grid[i0,  i1,  i2_, i3_, p] +
+                c0100 * grid[i0,  i1_, i2,  i3,  p] + c0101 * grid[i0,  i1_, i2,  i3_, p] +
+                c0110 * grid[i0,  i1_, i2_, i3,  p] + c0111 * grid[i0,  i1_, i2_, i3_, p] +
+                c1000 * grid[i0_, i1,  i2,  i3,  p] + c1001 * grid[i0_, i1,  i2,  i3_, p] +
+                c1010 * grid[i0_, i1,  i2_, i3,  p] + c1011 * grid[i0_, i1,  i2_, i3_, p] +
+                c1100 * grid[i0_, i1_, i2,  i3,  p] + c1101 * grid[i0_, i1_, i2,  i3_, p] +
+                c1110 * grid[i0_, i1_, i2_, i3,  p] + c1111 * grid[i0_, i1_, i2_, i3_, p]
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -183,13 +197,16 @@ def interpolator_nb(composition_array, data_grid, resolution,
 
     interpolate_grid_4d_linear(comp_flat, data_grid, resolution, out_flat, mask_lin_flat)
 
-    mask_nan = ~np.isfinite(out_flat).all(axis=1)
-    if mask_nan.any():
-        bad = comp_flat[mask_nan]
-        dists, idx = tree.query(bad)
+    # interpolate_grid_4d_linear writes NaN only for rows where mask_lin_flat=False,
+    # so ~mask_lin_flat is equivalent to the old isfinite scan but allocates ~40 MB
+    # less per step (no (N,9) bool intermediate from np.isfinite).
+    oob_mask = ~mask_lin_flat
+    if oob_mask.any():
+        bad = comp_flat[oob_mask]
+        dists, nn_idx = tree.query(bad)
         if max_nn_dist is not None and np.any(dists > max_nn_dist):
             raise RuntimeError("Some compositions are outside the CALPHAD domain (KD-tree).")
-        out_flat[mask_nan] = calphad_values[idx]
+        out_flat[oob_mask] = calphad_values[nn_idx]
 
     return out
 

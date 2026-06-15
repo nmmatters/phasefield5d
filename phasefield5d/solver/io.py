@@ -290,26 +290,43 @@ def init_traces(n_components):
         "time": [],
         "dt": [],
         "t_cfl": [],
+        "cfl_ratio": [],                                                      # dt / t_cfl
         "net": [],
         "composition_change_max": [],
         **{f"composition_change_max_s{j}": [] for j in range(n_components)},
         "mass": [],
         "total_flux": [],
+        # --- accuracy / stability diagnostics ---
+        **{f"comp_min_s{j}": [] for j in range(n_components)},               # min X_s over space
+        **{f"comp_max_s{j}": [] for j in range(n_components)},               # max X_s over space
+        "comp_fe_min": [],                                                    # min(1 - sum_s X_s): X_Fe lower bound
+        **{f"comp_var_s{j}": [] for j in range(n_components)},               # Var(X_s) over space
+        "f_grad": [],                                                         # gradient (interfacial) energy proxy
     }
 
 
 def update_traces(traces, timestep, time, dt, t_cfl, net,
-                  composition_change_max, composition_change_max_per_solute, mass, total_flux):
+                  composition_change_max, composition_change_max_per_solute, mass, total_flux,
+                  comp_min, comp_max, comp_fe_min, comp_var, f_grad):
     traces["timestep"].append(int(timestep))
     traces["time"].append(float(time))
     traces["dt"].append(float(dt))
     traces["t_cfl"].append(float(t_cfl))
+    traces["cfl_ratio"].append(float(dt / t_cfl) if t_cfl > 0.0 else float("inf"))
     traces["net"].append(np.asarray(net).tolist())
     traces["composition_change_max"].append(float(composition_change_max))
     for j, val in enumerate(np.asarray(composition_change_max_per_solute).ravel()):
         traces[f"composition_change_max_s{j}"].append(float(val))
     traces["mass"].append(np.asarray(mass).tolist())
     traces["total_flux"].append(np.asarray(total_flux).tolist())
+    for j, val in enumerate(np.asarray(comp_min).ravel()):
+        traces[f"comp_min_s{j}"].append(float(val))
+    for j, val in enumerate(np.asarray(comp_max).ravel()):
+        traces[f"comp_max_s{j}"].append(float(val))
+    traces["comp_fe_min"].append(float(comp_fe_min))
+    for j, val in enumerate(np.asarray(comp_var).ravel()):
+        traces[f"comp_var_s{j}"].append(float(val))
+    traces["f_grad"].append(float(f_grad))
 
 
 def finalize_traces(path, traces, filename="timeseries_info.csv"):

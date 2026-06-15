@@ -250,3 +250,68 @@ def gradients_pm_3d(c, dx, grad_plus, grad_minus):
                     grad_minus[1, i, j, k, s] = (center - c[i, jm, k, s]) * inv_dx
                     grad_plus[2, i, j, k, s]  = (c[i, j, kp, s] - center) * inv_dx
                     grad_minus[2, i, j, k, s] = (center - c[i, j, km, s]) * inv_dx
+
+
+# ---------------------------------------------------------------------------
+# Simplex clamp — renormalise voxels where Σ_s X[...,s] > 1 in-place
+# Replaces the three-line NumPy pattern (sum → mask → fancy-index divide)
+# with a single Numba kernel that allocates no temporary arrays, saving
+# ~36 MB/step at 3D@160³ (float64 sum array + bool mask).
+# ---------------------------------------------------------------------------
+
+@nb.njit(parallel=True, fastmath=False)
+def _clamp_simplex_1d(comp):
+    Nx, S = comp.shape
+    for i in nb.prange(Nx):
+        total = 0.0
+        for s in range(S):
+            total += comp[i, s]
+        if total > 1.0:
+            inv_total = 1.0 / total
+            for s in range(S):
+                comp[i, s] *= inv_total
+
+
+@nb.njit(parallel=True, fastmath=False)
+def _clamp_simplex_2d(comp):
+    Nx, Ny, S = comp.shape
+    for i in nb.prange(Nx):
+        for j in range(Ny):
+            total = 0.0
+            for s in range(S):
+                total += comp[i, j, s]
+            if total > 1.0:
+                inv_total = 1.0 / total
+                for s in range(S):
+                    comp[i, j, s] *= inv_total
+
+
+@nb.njit(parallel=True, fastmath=False)
+def _clamp_simplex_3d(comp):
+    Nx, Ny, Nz, S = comp.shape
+    for i in nb.prange(Nx):
+        for j in range(Ny):
+            for k in range(Nz):
+                total = 0.0
+                for s in range(S):
+                    total += comp[i, j, k, s]
+                if total > 1.0:
+                    inv_total = 1.0 / total
+                    for s in range(S):
+                        comp[i, j, k, s] *= inv_total
+
+
+def clamp_simplex(composition):
+    """In-place simplex clamp: renormalise voxels where Σ_s X[...,s] > 1.
+
+    Single-pass Numba kernel — no temporary float sum array, no bool mask array.
+    """
+    dim = composition.ndim - 1
+    if dim == 1:
+        _clamp_simplex_1d(composition)
+    elif dim == 2:
+        _clamp_simplex_2d(composition)
+    elif dim == 3:
+        _clamp_simplex_3d(composition)
+    else:
+        raise NotImplementedError(f"clamp_simplex not implemented for spatial_dims={dim}")

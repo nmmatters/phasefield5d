@@ -6,6 +6,14 @@ Designed for 4+1 component alloy systems (4 independent composition fields + 1 d
 
 ---
 
+## Example
+
+![1D spinodal decomposition – Fe₂₀Mn₁₀Ni₂₀Co₃₀Cu₂₀ at 873 K](media/fe20mn10ni20co30cu20_873k_1d.gif)
+
+*1D spinodal decomposition in Fe₂₀Mn₁₀Ni₂₀Co₃₀Cu₂₀ at 873 K. Each curve shows the relative composition deviation X<sub>s</sub> − X<sub>0</sub> for one element as a function of position. The characteristic wavelength set by the initial spinodal instability is visible in the early stage; domains coarsen over time as the system approaches the miscibility gap boundary.*
+
+---
+
 ## What it does
 
 Starting from a homogeneous alloy with small random composition fluctuations, the code time-evolves the coupled Cahn–Hilliard equations using:
@@ -232,7 +240,7 @@ results/
     └── elastic_cubic_direction100/          ← model tag
         └── cells1600_dx1e-08_..._20250101_120000/
             ├── metadata.json               # all simulation parameters
-            ├── timeseries_info.csv         # step, time, dt, max ΔX, mass, flux
+            ├── timeseries_info.csv         # per-save scalars (see below)
             ├── timeseries_info.json        # column schema for the CSV
             ├── data/
             │   ├── step_000000000_initial.npz
@@ -241,6 +249,21 @@ results/
                 ├── step_000000000_initial.png
                 └── step_000001234.png      # 1D line / 2D colourmap / 3D mid-slice
 ```
+
+**`timeseries_info.csv` columns** (one row per save event):
+
+| Column(s) | Description |
+|---|---|
+| `timestep`, `time`, `dt`, `t_cfl` | Step index, physical time (s), time increment (s), CFL bound (s) |
+| `cfl_ratio` | `dt / t_cfl` — CFL safety margin (< 1 = stable) |
+| `net[4]` | Spatial sum of unscaled dX/dt per component; ≈ 0 for periodic CH (no source) |
+| `composition_change_max`, `_s{0..3}` | Max \|dX/dt\| over space (all components; then per component) |
+| `mass[4]` | Total moles per component — mass conservation check (should be constant) |
+| `total_flux[4]` | Net face-flux sum per component; ≈ 0 for periodic BCs |
+| `comp_min_s{0..3}`, `comp_max_s{0..3}` | Spatial min/max of each independent component |
+| `comp_fe_min` | `1 − max(ΣX_s)` — lower bound on the implicit Fe fraction |
+| `comp_var_s{0..3}` | Spatial variance of each component — spinodal decomposition amplitude |
+| `f_grad` | Gradient (interfacial) energy proxy: `−½ dx^d Σ X·κ∇²X` |
 
 `.npz` files store `current_composition` with shape `(Nx[, Ny[, Nz]], 4)` and scalar keys `timestep`, `time`, `dt`. These can be converted to VTK for ParaView (3D runs only):
 

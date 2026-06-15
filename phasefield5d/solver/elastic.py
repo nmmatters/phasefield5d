@@ -35,6 +35,20 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
+# Optional pyfftw: pre-allocated FFTW plans with zero per-step allocation.
+# Install with:  pip install pyfftw
+# Without pyfftw, scipy.fft is used (allocates ~98 MB/step per elastic update
+# at 3D@160³: ~33 MB from rfftn output + ~65 MB from irfftn output).
+# ---------------------------------------------------------------------------
+
+try:
+    import pyfftw as _pyfftw
+    _PYFFTW_AVAILABLE = True
+except ImportError:
+    _PYFFTW_AVAILABLE = False
+
+
+# ---------------------------------------------------------------------------
 # Elastic coupling matrix (composition-space, evaluated at reference X)
 # ---------------------------------------------------------------------------
 
@@ -169,32 +183,71 @@ def make_elastic_updater(cfg, linear_elastic_coupling_matrix, elastic_kernel_r,
         # Λ = outer(v, v)  →  v = eigvec * sqrt(eigenvalue)
         l_vec = (eigvecs[:, -1] * np.sqrt(largest)).astype(field_dtype)
         _S = n_comp  # captured for reshape inside closure
+        mu_elastic = np.empty(field_shape, dtype=field_dtype)
 
-        work_scalar_real = np.empty(spatial_shape, dtype=field_dtype)
-        work_scalar_k    = np.empty(k_shape, dtype=np.complex128)
-        mu_elastic       = np.empty(field_shape, dtype=field_dtype)
+        if _PYFFTW_AVAILABLE:
+            # ---------------------------------------------------------------
+            # pyfftw path: pre-allocated FFTW plans — zero FFT allocation/step
+            # rfftn + irfftn together allocate ~98 MB/step (scipy); this path
+            # eliminates both by writing directly into aligned output buffers.
+            # Install with:  pip install pyfftw
+            # ---------------------------------------------------------------
+            import os as _os
+            _n_threads = fft_workers if fft_workers > 0 else (_os.cpu_count() or 1)
 
-        def elastic_update(chemical_potentials, composition_field):
-            # Scalar contraction  s(x) = v · (X(x) - X₀)
-            # _dot_misfit_flat avoids the (*spatial, n_comp) diff temporary
-            _dot_misfit_flat(
-                composition_field.reshape(-1, _S),
-                reference_composition, l_vec,
-                work_scalar_real.reshape(-1),
+            _fftw_real = _pyfftw.empty_aligned(spatial_shape, dtype='float64')
+            _fftw_k    = _pyfftw.empty_aligned(k_shape, dtype='complex128')
+            _fftw_bwd  = _pyfftw.empty_aligned(spatial_shape, dtype='float64')
+
+            # FFTW_MEASURE benchmarks several algorithms at plan creation;
+            # one-time cost amortised over millions of simulation steps.
+            _plan_fwd = _pyfftw.FFTW(
+                _fftw_real, _fftw_k,
+                axes=axes, direction='FFTW_FORWARD',
+                threads=_n_threads, flags=('FFTW_MEASURE',),
+            )
+            _plan_bwd = _pyfftw.FFTW(
+                _fftw_k, _fftw_bwd,
+                axes=axes, direction='FFTW_BACKWARD',
+                normalise_idft=True,
+                threads=_n_threads, flags=('FFTW_MEASURE',),
             )
 
-            # Forward FFT (scalar field only)
-            work_scalar_k[...] = _rfftn(work_scalar_real, axes=axes, workers=fft_workers)
+            def elastic_update(chemical_potentials, composition_field):
+                # s(x) = v · (X(x) - X₀) written directly into FFTW input buffer
+                _dot_misfit_flat(
+                    composition_field.reshape(-1, _S),
+                    reference_composition, l_vec,
+                    _fftw_real.reshape(-1),
+                )
+                _plan_fwd()                      # _fftw_real → _fftw_k (no alloc)
+                _fftw_k *= elastic_kernel_r      # in-place multiply by B̂(k)
+                _plan_bwd()                      # _fftw_k → _fftw_bwd  (no alloc)
+                np.multiply(_fftw_bwd[..., None], l_vec, out=mu_elastic)
+                chemical_potentials[...] += mu_elastic
 
-            # Multiply by elastic kernel B̂(k)
-            work_scalar_k[...] *= elastic_kernel_r
+        else:
+            # ---------------------------------------------------------------
+            # scipy fallback — allocates ~98 MB/step via rfftn + irfftn output
+            # ---------------------------------------------------------------
+            work_scalar_real = np.empty(spatial_shape, dtype=field_dtype)
+            work_scalar_k    = np.empty(k_shape, dtype=np.complex128)
 
-            # Backward FFT → multiply by v to distribute across components
-            # np.multiply with out= avoids the (*spatial, n_comp) broadcast temporary
-            scalar_r = _irfftn(work_scalar_k, s=spatial_shape, axes=axes,
-                               workers=fft_workers).real
-            np.multiply(scalar_r[..., None], l_vec, out=mu_elastic)
-            chemical_potentials[...] += mu_elastic
+            def elastic_update(chemical_potentials, composition_field):
+                # Scalar contraction  s(x) = v · (X(x) - X₀)
+                _dot_misfit_flat(
+                    composition_field.reshape(-1, _S),
+                    reference_composition, l_vec,
+                    work_scalar_real.reshape(-1),
+                )
+                # Forward FFT — _rfftn allocates ~33 MB output, copied into work_scalar_k
+                work_scalar_k[...] = _rfftn(work_scalar_real, axes=axes, workers=fft_workers)
+                work_scalar_k[...] *= elastic_kernel_r
+                # Backward FFT — _irfftn allocates ~65 MB complex output; .real is a view
+                scalar_r = _irfftn(work_scalar_k, s=spatial_shape, axes=axes,
+                                   workers=fft_workers).real
+                np.multiply(scalar_r[..., None], l_vec, out=mu_elastic)
+                chemical_potentials[...] += mu_elastic
 
     else:
         # General path (non-rank-1 coupling matrix)
