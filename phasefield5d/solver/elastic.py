@@ -73,6 +73,11 @@ def get_elastic_matrix(composition, vi, ri, c11, c12, c44,
 def build_khachaturyan_kernel(k_grid, k_norm, c11, c12, c44):
     """B(n) kernel in Fourier space [J/m³].
 
+    Uses the exact Khachaturyan Green's function rather than a polynomial
+    expansion.  The expansion (a/b series) is only accurate for small elastic
+    anisotropy; for A >> 1 (e.g. FeMnNiCoCu has A ≈ 4.2) it gives qualitatively
+    wrong signs at intermediate angles (~25–34° from <100>).
+
     k_grid : (3, ...) — embedded 3D wavevectors
     k_norm : (...)    — |k|
     """
@@ -82,15 +87,23 @@ def build_khachaturyan_kernel(k_grid, k_norm, c11, c12, c44):
         n2 = np.where(nonzero, k_grid[1] / k_norm, 0.0)
         n3 = np.where(nonzero, k_grid[2] / k_norm, 0.0)
 
-    a = c11 - c12 - 2.0 * c44
-    b = c11 + c12 + 2.0 * c44
-    d = c11 + 2.0 * c12 + 4.0 * c44
+    a  = c11 - c12 - 2.0 * c44           # anisotropy constant
+    b  = c11 + c12 + 2.0 * c44
+    d  = c11 + 2.0 * c12 + 4.0 * c44
 
-    ct = n1**2 * n2**2 + n2**2 * n3**2 + n3**2 * n1**2
-    c3 = n1**2 * n2**2 * n3**2
+    nf1 = n1**2 * n2**2 + n2**2 * n3**2 + n3**2 * n1**2   # Σ_{cyc} n_i² n_j²
+    nf2 = n1**2 * n2**2 * n3**2                             # n1² n2² n3²
 
-    phi_minus_avg = a / b * (4.0 * (ct - 1.0 / 5.0) + 54.0 * a / d * (c3 - 1.0 / 105.0))
-    B_n = np.where(nonzero, -(c11 + 2.0 * c12)**2 / c11 * phi_minus_avg, 0.0)
+    # Exact cubic elastic Green's function φ(n) and its orientational average
+    phi = np.where(
+        nonzero,
+        c11 * (1.0 + 2.0 * a / c44 * nf1 + 3.0 * (a / c44)**2 * nf2)
+        / (c11 + a * (c11 + c12) / c44 * nf1 + (a / c44)**2 * b * nf2),
+        1.0,
+    )
+    phi_avg = 1.0 + 4.0 * a / b / 5.0 + 54.0 * a**2 / (b * d) / 105.0
+
+    B_n = np.where(nonzero, -(c11 + 2.0 * c12)**2 / c11 * (phi - phi_avg), 0.0)
     return B_n * 1e9
 
 
