@@ -274,11 +274,40 @@ batch_npz_to_vti("path/to/run/data/")
 
 ---
 
-## Citation
+## How to Cite
 
-If you use this code in published work, please cite:
+If you use **phasefield5d** in published work, please cite both the software
+and the accompanying paper (once published):
+
+### Software
+
+```bibtex
+@software{phasefield5d,
+  author       = {Marschall, Niklas},
+  title        = {{phasefield5d}: Multi-component {Cahn--Hilliard} phase-field
+                  simulation for spinodal decomposition in high-entropy alloys},
+  year         = {2025},
+  publisher    = {GitHub},
+  url          = {https://github.com/nmmatters/phasefield5d},
+  note         = {MIT Licence}
+}
+```
+
+### Paper
 
 > *[Authors, Title, Journal, Year — to be updated upon publication]*
+
+```bibtex
+@article{phasefield5d_paper,
+  author  = {},
+  title   = {},
+  journal = {},
+  year    = {},
+  volume  = {},
+  pages   = {},
+  doi     = {}
+}
+```
 
 ---
 
