@@ -287,6 +287,7 @@ and the accompanying paper (once published):
   title        = {{phasefield5d}: Multi-component {Cahn--Hilliard} phase-field
                   simulation for spinodal decomposition in high-entropy alloys},
   date         = {2026-05-22},
+  version      = {0.1.0},
   url          = {https://github.com/nmmatters/phasefield5d},
   note         = {MIT Licence}
 }
