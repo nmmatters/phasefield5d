@@ -286,9 +286,7 @@ and the accompanying paper (once published):
   author       = {Marschall, Niklas},
   title        = {{phasefield5d}: Multi-component {Cahn--Hilliard} phase-field
                   simulation for spinodal decomposition in high-entropy alloys},
-  year         = {2026},
-  month        = {5},
-  day          = {22},
+  date         = {2026-05-22},
   url          = {https://github.com/nmmatters/phasefield5d},
   note         = {MIT Licence}
 }
