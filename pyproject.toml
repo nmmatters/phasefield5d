@@ -39,15 +39,21 @@ fast = [
     # when elastic anisotropy is enabled.  Install with:  pip install pyfftw
     "pyfftw>=0.13",
 ]
+gif = [
+    # Required by make-gif / generate_gif() in post_process.py
+    "pillow>=10.0",
+]
 all = [
     "mendeleev>=0.14",
     "pyfftw>=0.13",
+    "pillow>=10.0",
     "pytest>=7",
     "pytest-cov",
 ]
 
 [project.scripts]
 simulate-spinodal = "phasefield5d.cli:main"
+make-gif          = "phasefield5d.solver.post_process:_make_gif_cli"
 
 [tool.setuptools.packages.find]
 where = ["."]

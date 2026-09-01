@@ -265,7 +265,25 @@ results/
 | `comp_var_s{0..3}` | Spatial variance of each component — spinodal decomposition amplitude |
 | `f_grad` | Gradient (interfacial) energy proxy: `−½ dx^d Σ X·κ∇²X` |
 
-`.npz` files store `current_composition` with shape `(Nx[, Ny[, Nz]], 4)` and scalar keys `timestep`, `time`, `dt`. These can be converted to VTK for ParaView (3D runs only):
+`.npz` files store `current_composition` with shape `(Nx[, Ny[, Nz]], 4)` and scalar keys `timestep`, `time`, `dt`.
+
+**Generate an animated GIF** from the snapshot PNGs (requires `pillow`):
+
+```bash
+pip install "phasefield5d[gif]"
+
+# One GIF per skip rate (every frame, every 5th, every 10th) — saved next to snapshots/
+make-gif results/my_run/
+
+# Single GIF, every 5th frame, 80 ms per frame
+make-gif results/my_run/snapshots/ --skip 5 --duration 80
+
+# From Python
+from phasefield5d.solver.post_process import batch_generate_gifs
+batch_generate_gifs("results/my_run/snapshots/", skips=[1, 5, 10])
+```
+
+**Convert to VTK** for ParaView (3D runs only):
 
 ```python
 from phasefield5d.solver.post_process import batch_npz_to_vti
