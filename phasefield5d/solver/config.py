@@ -120,7 +120,7 @@ def build_parser(ncomp: int = 4) -> argparse.ArgumentParser:  # ncomp is always 
     adapt = p.add_argument_group("adaptive step limits")
     adapt.add_argument("--lower_limit", type=float, default=1e-5)
     adapt.add_argument("--upper_limit", type=float, default=1e-3)
-    adapt.add_argument("--safety", type=float, default=0.1)
+    adapt.add_argument("--safety", type=float, default=0.9)
 
     save = p.add_argument_group("save logic")
     save.add_argument("--early_stage_frames", type=int, default=100)
