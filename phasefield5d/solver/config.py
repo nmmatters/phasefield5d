@@ -94,7 +94,7 @@ def build_parser(ncomp: int = 4) -> argparse.ArgumentParser:  # ncomp is always 
     comp.add_argument("--initial_composition",
                       type=lambda s: composition_type(s, ncomp=4),
                       default="0.1,0.2,0.2,0.5")
-    comp.add_argument("--fluctuation", type=float, default=1e-3)
+    comp.add_argument("--fluctuation", type=float, default=1e-5)
 
     sysg = p.add_argument_group("system size")
     sysg.add_argument("--mw", type=int, default=100)
