@@ -238,14 +238,16 @@ def save_snapshot_figure(path, timestep, time, current_composition, initial_comp
         fig, ax = build_xy_axes(1, 1, 0, (6, 4), dpi=150)
         ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
         for s in range(5):
-            ax.plot(x, relative_change[:, s], "o-", markersize=1, linewidth=1.5, alpha=0.9)
+            ax.plot(x, relative_change[:, s], "o-", markersize=1, linewidth=1.5, alpha=0.9,
+                    label=alloy[s])
         ax.set_xlabel("x (nm)")
         ax.set_ylabel(r"relative change $X - X^\mathrm{ref}$ (-)")
         ax.set_title(f"time: {time:.1f} s")
         ax.set_xlim([0.0, x.max()])
         ax.axhline(0, color="black", linewidth=1, zorder=0)
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=5, frameon=False)
         fig.tight_layout()
-        fig.savefig(file_name)
+        fig.savefig(file_name, bbox_inches="tight")
         plt.close()
         return
 
