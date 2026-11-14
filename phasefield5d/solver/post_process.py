@@ -275,11 +275,16 @@ def generate_gif(
             canvas.paste(im, (0, 0))
             frames.append(canvas)
 
-    frames[0].save(
+    # Explicitly quantize each frame to palette mode — PIL's automatic RGB→GIF
+    # palette conversion is unreliable for multi-frame GIFs and causes all frames
+    # after the first to appear identical in many Pillow versions.
+    frames_p = [f.quantize(colors=256, dither=0) for f in frames]
+
+    frames_p[0].save(
         output_path,
         format="GIF",
         save_all=True,
-        append_images=frames[1:],
+        append_images=frames_p[1:],
         duration=duration,
         loop=loop,
         optimize=False,
