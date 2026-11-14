@@ -282,7 +282,6 @@ def generate_gif(
         append_images=frames[1:],
         duration=duration,
         loop=loop,
-        disposal=2,
         optimize=False,
     )
 
