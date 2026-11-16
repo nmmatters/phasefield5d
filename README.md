@@ -133,12 +133,13 @@ simulate-spinodal --temperature 873K --initial_composition 0.1,0.2,0.3,0.2 ...
 | `--include_cubic_anisotropy` | `True` | Enable/disable elastic driving force (`--no_include_cubic_anisotropy` to disable) |
 | `--total_timesteps` | `100 000` | Maximum number of time steps |
 | `--steps_per_ctld` | `1 000` | Target steps per characteristic time of linear decomposition (sets initial Δt) |
+| `--time_linear_end_multiplier` | `2` | Switch from fixed Δt to adaptive stepping after this multiple of CTLD (early linear regime) |
 | `--mw` | `100` | System length as multiple of the dominant spinodal wavelength |
 | `--ppw` | `16` | Spatial resolution: grid points per dominant wavelength |
 | `--threads` | `1` | Numba parallel threads (optimal ~16 for 3D) |
 | `--fft_workers` | `1` | scipy.fft threads for elastic kernel (`-1` = all cores) |
 | `--atomic_radius_tag` | `senkov` | Atomic radius convention: `senkov`, `kittel`, `riedlich`, `miracle` |
-| `--fluctuation` | `1e-3` | Amplitude of initial random composition fluctuations |
+| `--fluctuation` | `1e-5` | Amplitude of initial random composition fluctuations |
 
 ---
 

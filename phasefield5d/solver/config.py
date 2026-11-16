@@ -115,7 +115,7 @@ def build_parser(ncomp: int = 4) -> argparse.ArgumentParser:  # ncomp is always 
     timeg = p.add_argument_group("time scale")
     timeg.add_argument("--total_timesteps", type=int, default=100_000)
     timeg.add_argument("--steps_per_ctld", type=int, default=1_000)
-    timeg.add_argument("--time_linear_end_multiplier", type=float, default=100)
+    timeg.add_argument("--time_linear_end_multiplier", type=float, default=2)
 
     adapt = p.add_argument_group("adaptive step limits")
     adapt.add_argument("--lower_limit", type=float, default=1e-5)
