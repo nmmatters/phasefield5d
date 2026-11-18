@@ -236,7 +236,11 @@ def save_snapshot_figure(path, timestep, time, current_composition, initial_comp
 
         plt.rcParams.update({"font.size": 12})
         fig, ax = build_xy_axes(1, 1, 0, (6, 4), dpi=dpi)
-        _fmt = ScalarFormatter(useMathText=True)
+        class _Fmt(ScalarFormatter):
+            def set_locs(self, locs):
+                super().set_locs(locs)
+                self.format = "%.1f"
+        _fmt = _Fmt(useMathText=True)
         _fmt.set_powerlimits((-1, 1))
         ax.yaxis.set_major_formatter(_fmt)
         ax.yaxis.set_major_locator(plt.MaxNLocator(nbins=4, prune="both"))
