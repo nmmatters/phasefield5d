@@ -344,6 +344,141 @@ def batch_generate_gifs(
 
 
 # ---------------------------------------------------------------------------
+# MP4 generation from snapshot PNGs
+# ---------------------------------------------------------------------------
+
+def generate_mp4(
+    snapshot_dir,
+    output_path=None,
+    *,
+    skip=1,
+    fps=20,
+    max_frames=None,
+    verbose=True,
+):
+    """Create an MP4 video from the PNG snapshots in *snapshot_dir*.
+
+    Parameters
+    ----------
+    snapshot_dir : str or Path
+        Directory that contains the ``step_*.png`` snapshot files.
+    output_path : str or Path or None
+        Destination ``.mp4`` file.  Defaults to ``<snapshot_dir>/evolution.mp4``.
+    skip : int
+        Use every *skip*-th frame (1 = all frames).
+    fps : int or float
+        Frames per second in the output video (default 20).
+    max_frames : int or None
+        Cap the total number of frames after applying *skip*.
+    verbose : bool
+        Print progress messages.
+
+    Returns
+    -------
+    str
+        Absolute path to the written MP4 file.
+    """
+    try:
+        import imageio
+    except ImportError as exc:
+        raise ImportError(
+            "imageio with ffmpeg is required for MP4 generation.\n"
+            "Install it with:  pip install 'phasefield5d[mp4]'\n"
+            "Or:               pip install imageio[ffmpeg]"
+        ) from exc
+
+    snapshot_dir = Path(snapshot_dir)
+    pngs = sorted(snapshot_dir.glob("step_*.png"))
+    if not pngs:
+        raise FileNotFoundError(f"No step_*.png files found in {snapshot_dir}")
+
+    selected = pngs[::skip]
+    if max_frames is not None:
+        selected = selected[:max_frames]
+
+    if verbose:
+        print(f"Found {len(pngs)} snapshots; using {len(selected)} frames "
+              f"(skip={skip}{f', capped at {max_frames}' if max_frames else ''}).")
+
+    if output_path is None:
+        tag = "" if skip == 1 else f"_skip{skip}"
+        output_path = snapshot_dir / f"evolution{tag}.mp4"
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    writer = imageio.get_writer(
+        str(output_path),
+        fps=fps,
+        codec="libx264",
+        pixelformat="yuv420p",  # maximum browser/player compatibility
+        output_params=["-crf", "18"],
+    )
+    try:
+        import numpy as np
+        from PIL import Image as _PILImage
+        for p in selected:
+            frame = np.array(_PILImage.open(p).convert("RGB"))
+            # libx264 requires even dimensions
+            h, w = frame.shape[:2]
+            if h % 2 or w % 2:
+                frame = frame[: h - h % 2, : w - w % 2]
+            writer.append_data(frame)
+    finally:
+        writer.close()
+
+    if verbose:
+        size_mb = output_path.stat().st_size / 1e6
+        print(f"MP4 written → {output_path}  ({size_mb:.1f} MB)")
+
+    return str(output_path.resolve())
+
+
+def batch_generate_mp4s(
+    snapshot_dir,
+    output_dir=None,
+    *,
+    skips=(1, 5, 10),
+    fps=20,
+    max_frames=None,
+    verbose=True,
+):
+    """Generate one MP4 per entry in *skips* from the same snapshot directory.
+
+    Parameters
+    ----------
+    snapshot_dir : str or Path
+        Directory with ``step_*.png`` files.
+    output_dir : str or Path or None
+        Destination directory.  Defaults to *snapshot_dir*.
+    skips : sequence of int
+        Frame-skip values to generate.
+    fps, max_frames, verbose
+        Passed through to :func:`generate_mp4`.
+
+    Returns
+    -------
+    list of str
+        Paths of all written MP4 files.
+    """
+    snapshot_dir = Path(snapshot_dir)
+    output_dir   = Path(output_dir) if output_dir is not None else snapshot_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    written = []
+    for skip in skips:
+        tag  = "" if skip == 1 else f"_skip{skip}"
+        out  = output_dir / f"evolution{tag}.mp4"
+        path = generate_mp4(
+            snapshot_dir, out,
+            skip=skip, fps=fps,
+            max_frames=max_frames, verbose=verbose,
+        )
+        written.append(path)
+
+    return written
+
+
+# ---------------------------------------------------------------------------
 # make-gif CLI entry point
 # ---------------------------------------------------------------------------
 
@@ -432,6 +567,91 @@ def _make_gif_cli():
             skips=args.skips,
             duration=args.duration,
             loop=args.loop,
+            max_frames=args.max_frames,
+            verbose=verbose,
+        )
+
+
+# ---------------------------------------------------------------------------
+# make-mp4 CLI entry point
+# ---------------------------------------------------------------------------
+
+def _make_mp4_cli():
+    """Command-line interface for MP4 generation.
+
+    Usage::
+
+        make-mp4 <run_dir_or_snapshot_dir> [options]
+
+    Examples::
+
+        make-mp4 results/my_run/
+        make-mp4 results/my_run/snapshots/ --skip 5 --fps 30
+        make-mp4 results/my_run/ --skips 1 5 10 --output results/my_run/videos/
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="make-mp4",
+        description="Generate an MP4 video from phasefield5d snapshot PNGs.",
+    )
+    parser.add_argument(
+        "path",
+        help="Run directory (containing snapshots/) or snapshot directory directly.",
+    )
+    parser.add_argument(
+        "--skip", type=int, default=None,
+        help="Use every N-th frame.  If omitted, use --skips (default: 1 5 10).",
+    )
+    parser.add_argument(
+        "--skips", type=int, nargs="+", default=[1, 5, 10],
+        help="Generate one MP4 per skip value (default: 1 5 10).  "
+             "Ignored when --skip is set.",
+    )
+    parser.add_argument(
+        "--fps", type=float, default=20,
+        help="Frames per second (default: 20).",
+    )
+    parser.add_argument(
+        "--max-frames", type=int, default=None,
+        help="Cap number of frames after skip (default: no cap).",
+    )
+    parser.add_argument(
+        "--output", default=None,
+        help="Output file (single MP4) or directory (batch).  "
+             "Defaults to the snapshot directory.",
+    )
+    parser.add_argument(
+        "--quiet", action="store_true",
+        help="Suppress progress output.",
+    )
+    args = parser.parse_args()
+
+    p = Path(args.path)
+    if (p / "snapshots").is_dir():
+        snapshot_dir = p / "snapshots"
+    elif p.is_dir():
+        snapshot_dir = p
+    else:
+        parser.error(f"Path not found or not a directory: {p}")
+
+    verbose = not args.quiet
+
+    if args.skip is not None:
+        generate_mp4(
+            snapshot_dir,
+            output_path=args.output,
+            skip=args.skip,
+            fps=args.fps,
+            max_frames=args.max_frames,
+            verbose=verbose,
+        )
+    else:
+        batch_generate_mp4s(
+            snapshot_dir,
+            output_dir=args.output,
+            skips=args.skips,
+            fps=args.fps,
             max_frames=args.max_frames,
             verbose=verbose,
         )

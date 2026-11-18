@@ -284,6 +284,22 @@ from phasefield5d.solver.post_process import batch_generate_gifs
 batch_generate_gifs("results/my_run/snapshots/", skips=[1, 5, 10])
 ```
 
+**Generate an MP4** (requires `imageio[ffmpeg]`):
+
+```bash
+pip install "phasefield5d[mp4]"
+
+# One MP4 per skip rate — saved next to snapshots/
+make-mp4 results/my_run/
+
+# Single MP4, every 5th frame, 30 fps
+make-mp4 results/my_run/snapshots/ --skip 5 --fps 30
+
+# From Python
+from phasefield5d.solver.post_process import batch_generate_mp4s
+batch_generate_mp4s("results/my_run/snapshots/", skips=[1, 5, 10])
+```
+
 **Convert to VTK** for ParaView (3D runs only):
 
 ```python

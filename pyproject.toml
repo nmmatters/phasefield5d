@@ -43,10 +43,16 @@ gif = [
     # Required by make-gif / generate_gif() in post_process.py
     "pillow>=10.0",
 ]
+mp4 = [
+    # Required by make-mp4 / generate_mp4() in post_process.py
+    "imageio[ffmpeg]>=2.28",
+    "pillow>=10.0",
+]
 all = [
     "mendeleev>=0.14",
     "pyfftw>=0.13",
     "pillow>=10.0",
+    "imageio[ffmpeg]>=2.28",
     "pytest>=7",
     "pytest-cov",
 ]
@@ -54,6 +60,7 @@ all = [
 [project.scripts]
 simulate-spinodal = "phasefield5d.cli:main"
 make-gif          = "phasefield5d.solver.post_process:_make_gif_cli"
+make-mp4          = "phasefield5d.solver.post_process:_make_mp4_cli"
 
 [tool.setuptools.packages.find]
 where = ["."]
