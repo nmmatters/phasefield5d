@@ -239,6 +239,7 @@ def save_snapshot_figure(path, timestep, time, current_composition, initial_comp
         _fmt = ScalarFormatter(useMathText=True)
         _fmt.set_powerlimits((-1, 1))
         ax.yaxis.set_major_formatter(_fmt)
+        ax.yaxis.set_major_locator(plt.MaxNLocator(nbins=4, prune="both"))
         for s in range(5):
             ax.plot(x, relative_change[:, s], "o-", markersize=1, linewidth=1.5, alpha=0.9,
                     label=alloy[s])
