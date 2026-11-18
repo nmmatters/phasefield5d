@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.ticker import FormatStrFormatter
+from matplotlib.ticker import ScalarFormatter
 
 from phasefield5d.utils.figures import build_xy_axes
 from phasefield5d.utils.labels import get_composition_label
@@ -236,7 +236,9 @@ def save_snapshot_figure(path, timestep, time, current_composition, initial_comp
 
         plt.rcParams.update({"font.size": 12})
         fig, ax = build_xy_axes(1, 1, 0, (6, 4), dpi=dpi)
-        ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+        _fmt = ScalarFormatter(useMathText=True)
+        _fmt.set_powerlimits((-1, 1))
+        ax.yaxis.set_major_formatter(_fmt)
         for s in range(5):
             ax.plot(x, relative_change[:, s], "o-", markersize=1, linewidth=1.5, alpha=0.9,
                     label=alloy[s])
