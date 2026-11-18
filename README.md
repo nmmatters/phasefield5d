@@ -216,7 +216,11 @@ phasefield5d/
 │   │   ├── io.py               # Save states, figures, traces, metadata
 │   │   └── post_process.py     # Convert .npz snapshots to VTK / VTI
 │   ├── utils/                  # Shared helpers (figures, diagnostics, transforms)
+│   ├── analysis/               # Post-simulation analysis tools
+│   │   └── correlation.py      # Spatial correlation analysis (autocorr, cross-corr, spectral)
 │   └── cli.py                  # `simulate-spinodal` entry point
+├── notebooks/
+│   └── correlation_analysis.ipynb  # Interactive visualisation of correlation results
 ├── examples/
 │   └── simulate.py             # Full simulation script (edit and run directly)
 ├── run/
@@ -308,6 +312,23 @@ make-mp4 results/my_run/snapshots/ --skip 5 --fps 30
 from phasefield5d.solver.post_process import batch_generate_mp4s
 batch_generate_mp4s("results/my_run/snapshots/", skips=[1, 5, 10])
 ```
+
+**Run spatial correlation analysis** (time-resolved autocorrelation and cross-correlation matrices):
+
+```bash
+# Compute and save to <run_dir>/correlation_results.npz
+make-correlations results/my_run/
+
+# With options
+make-correlations results/my_run/ --max-lag 200 --kspace --no-periodic
+
+# From Python
+from phasefield5d.analysis.correlation import analyze_run, save_results
+results = analyze_run("results/my_run/", compute_kspace=True)
+save_results(results, "results/my_run/correlation_results.npz")
+```
+
+Then open `notebooks/correlation_analysis.ipynb` for interactive visualisation (colour limits, selected time steps, axis scales).
 
 **Convert to VTK/VTI** for ParaView (3D runs; works for any dimensionality):
 

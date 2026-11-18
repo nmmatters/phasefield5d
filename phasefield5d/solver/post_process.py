@@ -225,6 +225,82 @@ def batch_npz_to_vtk(
 
 
 # ---------------------------------------------------------------------------
+# make-correlations CLI entry point
+# ---------------------------------------------------------------------------
+
+def _make_correlations_cli():
+    """Command-line interface for spatial correlation analysis.
+
+    Usage::
+
+        make-correlations <run_dir> [options]
+
+    Examples::
+
+        make-correlations results/my_run/
+        make-correlations results/my_run/ --max-lag 200 --kspace
+        make-correlations results/my_run/ --output results/my_run/corr.npz
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="make-correlations",
+        description="Compute time-resolved spatial correlation analysis for a phasefield5d run.",
+    )
+    parser.add_argument(
+        "run_dir",
+        help="Run directory containing metadata.json and data/.",
+    )
+    parser.add_argument(
+        "--max-lag", type=int, default=None,
+        help="Maximum lag index (default: N//4 of grid size).",
+    )
+    parser.add_argument(
+        "--no-periodic", dest="periodic", action="store_false", default=True,
+        help="Disable periodic shift in correlation (use truncated form).",
+    )
+    parser.add_argument(
+        "--kspace", action="store_true", default=False,
+        help="Also compute k-space spectral correlation matrix.",
+    )
+    parser.add_argument(
+        "--output", default=None,
+        help="Output .npz file (default: <run_dir>/correlation_results.npz).",
+    )
+    parser.add_argument(
+        "--quiet", action="store_true",
+        help="Suppress progress output.",
+    )
+    args = parser.parse_args()
+
+    from phasefield5d.analysis.correlation import analyze_run, save_results
+
+    run_dir = Path(args.run_dir)
+    if not run_dir.is_dir():
+        parser.error(f"Directory not found: {run_dir}")
+
+    out_path = Path(args.output) if args.output else run_dir / "correlation_results.npz"
+
+    if not args.quiet:
+        print(f"Running correlation analysis on {run_dir} …")
+
+    results = analyze_run(
+        run_dir,
+        max_lag=args.max_lag,
+        periodic=args.periodic,
+        compute_kspace=args.kspace,
+    )
+
+    save_results(results, out_path)
+
+    if not args.quiet:
+        n_time = len(results["time"])
+        n_lag  = results["C_lij"].shape[1]
+        print(f"  {n_time} time steps × {n_lag} lag values")
+        print(f"Saved → {out_path.resolve()}")
+
+
+# ---------------------------------------------------------------------------
 # make-vtk CLI entry point
 # ---------------------------------------------------------------------------
 
