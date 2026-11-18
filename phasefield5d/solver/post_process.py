@@ -1,6 +1,7 @@
-"""Post-processing utilities: npz iteration, run-name parsing, VTK export, GIF generation."""
+"""Post-processing utilities: npz iteration, run-name parsing, VTK export, snapshot/GIF/MP4 generation."""
 import re
 import os
+import json
 import struct
 import base64
 import numpy as np
@@ -303,6 +304,143 @@ def _make_vtk_cli():
             component_names=component_names,
             verbose=verbose,
         )
+
+
+# ---------------------------------------------------------------------------
+# Snapshot regeneration from .npz data
+# ---------------------------------------------------------------------------
+
+def regenerate_snapshots(
+    run_dir,
+    *,
+    dpi=150,
+    overwrite=True,
+    verbose=True,
+):
+    """Regenerate all snapshot PNGs for a run from its .npz data files.
+
+    Reads ``metadata.json`` for alloy, initial composition and cell size, then
+    calls :func:`~phasefield5d.solver.io.save_snapshot_figure` for every
+    ``.npz`` file in ``<run_dir>/data/``.  Useful when the visualisation code
+    changes (e.g. a legend was added) and existing PNGs need to be refreshed.
+
+    Parameters
+    ----------
+    run_dir : str or Path
+        Run directory containing ``metadata.json`` and ``data/``.
+    dpi : int
+        Figure resolution (default 150).
+    overwrite : bool
+        If False, skip frames whose ``.png`` already exists.
+    verbose : bool
+        Print progress messages.
+
+    Returns
+    -------
+    int
+        Number of snapshots written.
+    """
+    from phasefield5d.solver.io import save_snapshot_figure
+
+    run_dir = Path(run_dir)
+    meta_path = run_dir / "metadata.json"
+    if not meta_path.is_file():
+        raise FileNotFoundError(f"metadata.json not found in {run_dir}")
+
+    with open(meta_path) as f:
+        meta = json.load(f)
+
+    alloy            = meta["elements"]
+    initial_comp     = np.array(meta["initial_composition"], dtype=float)
+    cell_size        = float(meta["cell_size"])
+
+    data_dir     = run_dir / "data"
+    snapshot_dir = run_dir / "snapshots"
+    snapshot_dir.mkdir(exist_ok=True)
+
+    npz_files = sorted(data_dir.glob("*.npz"))
+    if not npz_files:
+        raise FileNotFoundError(f"No .npz files found in {data_dir}")
+
+    if verbose:
+        print(f"Regenerating {len(npz_files)} snapshots in {snapshot_dir}")
+
+    written = 0
+    for npz_path in npz_files:
+        postfix = "_initial" if npz_path.stem.endswith("_initial") else ""
+        stem    = npz_path.stem.replace("_initial", "")
+        timestep_str = stem.replace("step_", "")
+        out_png = snapshot_dir / f"{npz_path.stem}.png"
+
+        if not overwrite and out_png.exists():
+            continue
+
+        with np.load(npz_path, allow_pickle=False) as z:
+            timestep    = int(z["timestep"])
+            time        = float(z["time"])
+            current_comp = z["current_composition"]
+
+        save_snapshot_figure(
+            str(run_dir), timestep, time,
+            current_comp, initial_comp, cell_size, alloy,
+            postfix=postfix, dpi=dpi,
+        )
+        written += 1
+        if verbose:
+            print(f"  {out_png.name}")
+
+    if verbose:
+        print(f"Done — {written} snapshots written.")
+    return written
+
+
+# ---------------------------------------------------------------------------
+# make-snapshots CLI entry point
+# ---------------------------------------------------------------------------
+
+def _make_snapshots_cli():
+    """Command-line interface for snapshot regeneration.
+
+    Usage::
+
+        make-snapshots <run_dir> [options]
+
+    Examples::
+
+        make-snapshots results/my_run/
+        make-snapshots results/my_run/ --dpi 200
+        make-snapshots results/my_run/ --no-overwrite
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="make-snapshots",
+        description="Regenerate snapshot PNGs from phasefield5d .npz data files.",
+    )
+    parser.add_argument(
+        "run_dir",
+        help="Run directory containing metadata.json and data/.",
+    )
+    parser.add_argument(
+        "--dpi", type=int, default=150,
+        help="Figure resolution in DPI (default: 150).",
+    )
+    parser.add_argument(
+        "--no-overwrite", dest="overwrite", action="store_false", default=True,
+        help="Skip frames whose .png already exists.",
+    )
+    parser.add_argument(
+        "--quiet", action="store_true",
+        help="Suppress progress output.",
+    )
+    args = parser.parse_args()
+
+    regenerate_snapshots(
+        args.run_dir,
+        dpi=args.dpi,
+        overwrite=args.overwrite,
+        verbose=not args.quiet,
+    )
 
 
 # ---------------------------------------------------------------------------

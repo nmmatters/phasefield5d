@@ -59,6 +59,7 @@ all = [
 
 [project.scripts]
 simulate-spinodal = "phasefield5d.cli:main"
+make-snapshots    = "phasefield5d.solver.post_process:_make_snapshots_cli"
 make-gif          = "phasefield5d.solver.post_process:_make_gif_cli"
 make-mp4          = "phasefield5d.solver.post_process:_make_mp4_cli"
 make-vtk          = "phasefield5d.solver.post_process:_make_vtk_cli"

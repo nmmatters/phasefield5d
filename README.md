@@ -268,6 +268,15 @@ results/
 
 `.npz` files store `current_composition` with shape `(Nx[, Ny[, Nz]], 4)` and scalar keys `timestep`, `time`, `dt`.
 
+**Regenerate snapshot PNGs** from `.npz` data (useful after visualisation code changes):
+
+```bash
+make-snapshots results/my_run/
+
+# Skip frames that already exist
+make-snapshots results/my_run/ --no-overwrite
+```
+
 **Generate an animated GIF** from the snapshot PNGs (requires `pillow`):
 
 ```bash
