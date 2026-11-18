@@ -300,11 +300,21 @@ from phasefield5d.solver.post_process import batch_generate_mp4s
 batch_generate_mp4s("results/my_run/snapshots/", skips=[1, 5, 10])
 ```
 
-**Convert to VTK** for ParaView (3D runs only):
+**Convert to VTK/VTI** for ParaView (3D runs; works for any dimensionality):
 
-```python
+```bash
+# Binary VTI — recommended (default)
+make-vtk results/my_run/
+
+# With physical spacing (metres)
+make-vtk results/my_run/ --spacing 1e-10 1e-10 1e-10
+
+# Legacy ASCII VTK — maximum compatibility
+make-vtk results/my_run/ --format vtk
+
+# From Python
 from phasefield5d.solver.post_process import batch_npz_to_vti
-batch_npz_to_vti("path/to/run/data/")
+batch_npz_to_vti("results/my_run/data/", spacing=(1e-10, 1e-10, 1e-10))
 ```
 
 ---

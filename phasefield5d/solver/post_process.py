@@ -193,6 +193,118 @@ def batch_npz_to_vti(
     return written
 
 
+def batch_npz_to_vtk(
+    input_dir,
+    output_dir=None,
+    spacing=(1.0, 1.0, 1.0),
+    origin=(0.0, 0.0, 0.0),
+    component_names=("Fe", "Mn", "Ni", "Co", "Cu"),
+    verbose=True,
+):
+    """Convert all .npz files in a directory to .vtk (sorted for ParaView animations)."""
+    input_dir = Path(input_dir)
+    output_dir = Path(output_dir) if output_dir is not None else input_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    npz_files = sorted(input_dir.glob("*.npz"))
+    if verbose:
+        print(f"Found {len(npz_files)} .npz files in {input_dir}")
+
+    written = []
+    for npz_file in npz_files:
+        vtk_file = output_dir / (npz_file.stem + ".vtk")
+        if verbose:
+            print(f"Converting {npz_file.name} → {vtk_file.name}")
+        written.append(npz_to_vtk(npz_file, vtk_file, spacing=spacing,
+                                   origin=origin, component_names=component_names))
+
+    if verbose:
+        print(f"Finished writing {len(written)} .vtk files.")
+    return written
+
+
+# ---------------------------------------------------------------------------
+# make-vtk CLI entry point
+# ---------------------------------------------------------------------------
+
+def _make_vtk_cli():
+    """Command-line interface for VTK/VTI export.
+
+    Usage::
+
+        make-vtk <run_dir_or_data_dir> [options]
+
+    Examples::
+
+        make-vtk results/my_run/
+        make-vtk results/my_run/data/ --format vtk
+        make-vtk results/my_run/ --spacing 1e-10 1e-10 1e-10 --output results/my_run/vtk/
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="make-vtk",
+        description="Export phasefield5d .npz snapshots to VTK/VTI for ParaView.",
+    )
+    parser.add_argument(
+        "path",
+        help="Run directory (containing data/) or data directory directly.",
+    )
+    parser.add_argument(
+        "--format", choices=["vti", "vtk"], default="vti",
+        help="Output format: vti = binary XML ImageData (default, recommended); "
+             "vtk = legacy ASCII (maximum compatibility).",
+    )
+    parser.add_argument(
+        "--spacing", type=float, nargs=3, default=[1.0, 1.0, 1.0],
+        metavar=("DX", "DY", "DZ"),
+        help="Voxel spacing in physical units (default: 1.0 1.0 1.0).",
+    )
+    parser.add_argument(
+        "--elements", type=str, default="Fe,Mn,Ni,Co,Cu",
+        help="Comma-separated element names in component order (default: Fe,Mn,Ni,Co,Cu).",
+    )
+    parser.add_argument(
+        "--output", default=None,
+        help="Output directory (default: same as data directory).",
+    )
+    parser.add_argument(
+        "--quiet", action="store_true",
+        help="Suppress progress output.",
+    )
+    args = parser.parse_args()
+
+    p = Path(args.path)
+    if (p / "data").is_dir():
+        data_dir = p / "data"
+    elif p.is_dir():
+        data_dir = p
+    else:
+        parser.error(f"Path not found or not a directory: {p}")
+
+    component_names = tuple(e.strip() for e in args.elements.split(",") if e.strip())
+    spacing = tuple(args.spacing)
+    output_dir = Path(args.output) if args.output else None
+    verbose = not args.quiet
+
+    if args.format == "vti":
+        batch_npz_to_vti(
+            data_dir,
+            output_dir=output_dir,
+            spacing=spacing,
+            component_names=component_names,
+            verbose=verbose,
+        )
+    else:
+        batch_npz_to_vtk(
+            data_dir,
+            output_dir=output_dir,
+            spacing=spacing,
+            component_names=component_names,
+            verbose=verbose,
+        )
+
+
 # ---------------------------------------------------------------------------
 # GIF generation from snapshot PNGs
 # ---------------------------------------------------------------------------
