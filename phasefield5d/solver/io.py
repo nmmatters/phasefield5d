@@ -235,7 +235,7 @@ def save_snapshot_figure(path, timestep, time, current_composition, initial_comp
         relative_change = current5 - reference5
 
         plt.rcParams.update({"font.size": 12})
-        fig, ax = build_xy_axes(1, 1, 0, (6, 4), dpi=150)
+        fig, ax = build_xy_axes(1, 1, 0, (6, 4), dpi=dpi)
         ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
         for s in range(5):
             ax.plot(x, relative_change[:, s], "o-", markersize=1, linewidth=1.5, alpha=0.9,
