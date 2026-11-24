@@ -6,7 +6,7 @@ from phasefield5d.elasticity.energies import (
     calculate_lattice_strain_coefficients,
     calculate_molar_volume,
 )
-from phasefield5d.elasticity.anisotropy import calculate_khachaturyan_elastic_anisotropy
+from phasefield5d.elasticity.anisotropy import calculate_khachaturyan_elastic_anisotropy, _phi_average
 
 
 # ---------------------------------------------------------------------------
@@ -89,19 +89,18 @@ def build_khachaturyan_kernel(k_grid, k_norm, c11, c12, c44):
 
     a  = c11 - c12 - 2.0 * c44           # anisotropy constant
     b  = c11 + c12 + 2.0 * c44
-    d  = c11 + 2.0 * c12 + 4.0 * c44
 
     nf1 = n1**2 * n2**2 + n2**2 * n3**2 + n3**2 * n1**2   # Σ_{cyc} n_i² n_j²
     nf2 = n1**2 * n2**2 * n3**2                             # n1² n2² n3²
 
-    # Exact cubic elastic Green's function φ(n) and its orientational average
+    # Exact φ(n) and its numerical orientational average (not the series approx.)
     phi = np.where(
         nonzero,
         c11 * (1.0 + 2.0 * a / c44 * nf1 + 3.0 * (a / c44)**2 * nf2)
         / (c11 + a * (c11 + c12) / c44 * nf1 + (a / c44)**2 * b * nf2),
         1.0,
     )
-    phi_avg = 1.0 + 4.0 * a / b / 5.0 + 54.0 * a**2 / (b * d) / 105.0
+    phi_avg = _phi_average(c11, c12, c44)
 
     B_n = np.where(nonzero, -(c11 + 2.0 * c12)**2 / c11 * (phi - phi_avg), 0.0)
     return B_n * 1e9

@@ -207,3 +207,30 @@ def test_out_of_bounds_nan():
     X = np.full((16, 4), 0.1)
     X[5, 2] = np.nan
     assert out_of_bounds(X)
+
+
+# ---------------------------------------------------------------------------
+# Elastic anisotropy values  (would have caught the series-average bug)
+# ---------------------------------------------------------------------------
+
+def test_phi_111_exact():
+    """φ([111]) = 3c11 / (c11 + 2c12 + 4c44) analytically."""
+    from phasefield5d.elasticity.anisotropy import _phi
+    c11, c12, c44 = 189.8e9, 123.8e9, 139.2e9
+    expected = 3 * c11 / (c11 + 2 * c12 + 4 * c44)
+    got = _phi(np.array([1.0, 1.0, 1.0]), c11, c12, c44)
+    np.testing.assert_allclose(got, expected, rtol=1e-10)
+
+
+def test_kernel_zero_mean():
+    """B(n) must average to ≈ 0 over all k-directions (kernel has no DC bias)."""
+    from phasefield5d.solver.system import build_fourier_grid_3d
+    from phasefield5d.solver.elastic import build_khachaturyan_kernel
+    c11, c12, c44 = 189.8e9, 123.8e9, 139.2e9
+    k_grid, k_norm = build_fourier_grid_3d(32, 32, 32, 1e-9)
+    K = build_khachaturyan_kernel(k_grid, k_norm, c11, c12, c44)
+    nonzero = k_norm > 0
+    # Mean over all non-zero k directions should be < 1 % of max |B|
+    mean_B = np.abs(K[nonzero].mean())
+    max_B  = np.abs(K[nonzero]).max()
+    assert mean_B < 0.01 * max_B, f"kernel mean {mean_B:.3e} is {mean_B/max_B:.1%} of max"
